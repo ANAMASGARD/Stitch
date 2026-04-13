@@ -40,25 +40,24 @@ const LoginUI = () => {
     };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#e4d9c7] p-4 md:p-8 font-sans">
-      <Card className="w-full max-w-5xl grid grid-cols-1 md:grid-cols-2 bg-white overflow-hidden border-4 border-black shadow-[8px_8px_0_0_#000] p-0 rounded-2xl h-auto">
-
+    <div className="min-h-screen flex items-center justify-center bg-[#e4d9c7] text-black p-4 md:p-8 font-sans">
+      <Card className="w-full max-w-5xl grid grid-cols-1 md:grid-cols-2 bg-white text-black overflow-hidden border-4 border-black shadow-[8px_8px_0_0_#000] p-0 rounded-2xl h-auto">
         {/* Left Side: Form */}
-        <div className="p-6 md:p-8 flex flex-col justify-center bg-[#f7d6a7]">
+        <div className="p-6 md:p-8 flex flex-col justify-center bg-[#f7d6a7] text-black">
           <div className="mb-6">
-            <h1 className="text-3xl md:text-4xl font-black mb-2 font-head uppercase tracking-tight">Stitch</h1>
+            <h1 className="text-3xl md:text-4xl font-black text-black mb-2 font-head uppercase tracking-tight">Stitch</h1>
             <p className="text-black/80 font-bold border-b-2 border-black inline-block pb-1 text-sm md:text-base">Authenticate to connect your repositories.</p>
           </div>
 
           <div className="space-y-4">
             <div className="space-y-1">
-              <Label className="font-bold text-sm md:text-base uppercase">Username</Label>
-              <Input className="border-4 border-black shadow-[4px_4px_0_0_#000] rounded-xl bg-white py-4 md:py-6 text-base" placeholder="Enter Your Name" />
+              <Label className="font-bold text-sm md:text-base text-black uppercase">Username</Label>
+              <Input className="border-4 border-black shadow-[4px_4px_0_0_#000] rounded-xl text-black bg-white py-4 md:py-6 text-base placeholder:text-black/50" placeholder="Enter Your Name" />
             </div>
 
             <div className="space-y-1">
-              <Label className="font-bold text-sm md:text-base uppercase">Workspace URL</Label>
-              <Input className="border-4 border-black shadow-[4px_4px_0_0_#000] rounded-xl bg-white py-4 md:py-6 text-base" placeholder="github.com/your-org" />
+              <Label className="font-bold text-sm md:text-base text-black uppercase">Workspace URL</Label>
+              <Input className="border-4 border-black shadow-[4px_4px_0_0_#000] rounded-xl text-black bg-white py-4 md:py-6 text-base placeholder:text-black/50" placeholder="github.com/your-org" />
             </div>
 
             <Button

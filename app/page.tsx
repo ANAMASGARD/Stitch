@@ -10,12 +10,12 @@ export default async function Home() {
   });
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-[#e4d9c7] p-8 font-sans">
+    <div className="flex flex-col items-center justify-center min-h-screen bg-[#e4d9c7] text-black p-8 font-sans">
       <div className="text-center max-w-2xl bg-white border-4 border-black shadow-[8px_8px_0_0_#000] p-12 rounded-2xl">
-        <h1 className="text-6xl font-black mb-6 font-head uppercase tracking-tight">
+        <h1 className="text-6xl text-black font-black mb-6 font-head uppercase tracking-tight">
           Stitch
         </h1>
-        <p className="text-xl font-bold mb-10 border-b-2 border-black inline-block pb-2">
+        <p className="text-xl text-black font-bold mb-10 border-b-2 border-black inline-block pb-2">
           Your AI-powered GitHub orchestration platform.
         </p>
 
