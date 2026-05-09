@@ -37,7 +37,7 @@
 }
 
 :root {
-  --radius: 0;
+  --radius: 0; /* Kept at 0 to maintain the Neo-brutalist / Retro UI sharp edges */
   --background: #fff;
   --foreground: #000;
   --card: #fff;
@@ -47,14 +47,14 @@
   --primary-foreground: #000;
   --secondary: #000;
   --secondary-foreground: #fff;
-  --muted: #aeaeae;
+  --muted: #cccccc; /* Cleaner muted background */
   --muted-foreground: #5a5a5a;
   --accent: #fae583;
   --accent-foreground: #000;
   --destructive: #e63946;
   --destructive-foreground: #fff;
   --border: #000;
-  --ring: #ffdb33;
+  --ring: #ffdb33; /* Kept this to prevent Tailwind v4 build crash */
 }
 
 .dark {
@@ -74,8 +74,8 @@
   --accent-foreground: #000;
   --destructive: #e63946;
   --destructive-foreground: #fff;
-  --border: #3a3a3a;
-  --ring: #ffdb33;
+  --border: #5c5c5c; /* Cleaner dark mode border from your snippet */
+  --ring: #ffdb33; /* Kept this to prevent Tailwind v4 build crash */
 }
 
 @layer base {
