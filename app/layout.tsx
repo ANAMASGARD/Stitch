@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Archivo_Black, Space_Grotesk, Instrument_Serif, Inter } from "next/font/google";
+import Script from "next/script";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryProvider } from "@/components/providers/query-provider";
 import "./globals.css";
@@ -56,7 +57,11 @@ const ThemeInitializerScript = () => {
       }
     } catch (_) {}
   `;
-  return <script dangerouslySetInnerHTML={{ __html: cssString }} />;
+  return (
+    <Script id="theme-initializer" strategy="beforeInteractive">
+      {cssString}
+    </Script>
+  );
 };
 
 export default function RootLayout({
