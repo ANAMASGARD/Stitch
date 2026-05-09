@@ -3,6 +3,7 @@ import { Archivo_Black, Space_Grotesk, Instrument_Serif, Inter } from "next/font
 import Script from "next/script";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryProvider } from "@/components/providers/query-provider";
+import { Toaster } from "@/components/retroui/Sonner";
 import "./globals.css";
 
 const archivoBlack = Archivo_Black({
@@ -80,7 +81,10 @@ export default function RootLayout({
       </head>
       <body className="min-h-full flex flex-col">
         <QueryProvider>
-          <TooltipProvider>{children}</TooltipProvider>
+          <TooltipProvider>
+            {children}
+            <Toaster />
+          </TooltipProvider>
         </QueryProvider>
       </body>
     </html>

@@ -8,6 +8,8 @@ import { Command } from "@/components/retroui/Command";
 import { ExternalLink, Star, Search } from "lucide-react";
 import { useRepositories } from "@/module/repository/hooks/use-repositories";
 import { RepositoryListSkeleton } from "@/module/repository/components/repository-skeleton";
+import { useConnectRepository } from "@/module/repository/hooks/use-connect-repository";
+import { useDisconnectRepository } from "@/module/repository/hooks/use-disconnect-repository";
 
 interface Repository {
   id: number;
@@ -17,14 +19,20 @@ interface Repository {
   html_url: string;
   stargazers_count: number;
   language: string | null;
-  topics: string[];
+  topics?: string[];
   isConnected?: boolean;
 }
 
 const RepositoryPage = () => {
   const { data, isLoading, isError, error, fetchNextPage, hasNextPage, isFetchingNextPage } = useRepositories();
+
+  const { mutate: connectRepository } = useConnectRepository();
+  const { mutate: disconnectRepository } = useDisconnectRepository();
+
   const [localConnectingId, setLocalConnectingId] = useState<number | null>(null);
+  const [localDisconnectingId, setLocalDisconnectingId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [filter, setFilter] = useState<"all" | "connected" | "unconnected">("all");
   const observerTarget = useRef<HTMLDivElement>(null);
 
   const allRepositories = data?.pages.flatMap((page) => page) || [];
@@ -34,6 +42,13 @@ const RepositoryPage = () => {
       repo.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       repo.full_name.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const statusFilteredRepositories = filteredRepositories.filter((repo: Repository) => {
+    if (filter === "all") return true;
+    if (filter === "connected") return repo.isConnected;
+    if (filter === "unconnected") return !repo.isConnected;
+    return true;
+  });
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -61,8 +76,26 @@ const RepositoryPage = () => {
 
   const handleConnect = (repo: Repository) => {
     setLocalConnectingId(repo.id);
-    // TODO: implement connect logic
-    setTimeout(() => setLocalConnectingId(null), 1000);
+    connectRepository(
+      {
+        owner: repo.full_name.split("/")[0],
+        repo: repo.name,
+        githubId: repo.id
+      },
+      {
+        onSettled: () => setLocalConnectingId(null)
+      }
+    );
+  };
+
+  const handleDisconnect = (repo: Repository) => {
+    setLocalDisconnectingId(repo.id);
+    disconnectRepository(
+      { githubId: repo.id },
+      {
+        onSettled: () => setLocalDisconnectingId(null)
+      }
+    );
   };
 
   if (isLoading) {
@@ -87,9 +120,34 @@ const RepositoryPage = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight font-head">Repositories</h1>
-        <p className="text-muted-foreground">Manage and view all your GitHub repositories</p>
+      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight font-head">Repositories</h1>
+          <p className="text-muted-foreground">Manage and view all your GitHub repositories</p>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant={filter === "all" ? "default" : "outline"}
+            onClick={() => setFilter("all")}
+            size="sm"
+          >
+            All
+          </Button>
+          <Button
+            variant={filter === "connected" ? "default" : "outline"}
+            onClick={() => setFilter("connected")}
+            size="sm"
+          >
+            Connected
+          </Button>
+          <Button
+            variant={filter === "unconnected" ? "default" : "outline"}
+            onClick={() => setFilter("unconnected")}
+            size="sm"
+          >
+            Unconnected
+          </Button>
+        </div>
       </div>
 
       <Command className="border-2 shadow-md">
@@ -118,7 +176,7 @@ const RepositoryPage = () => {
       </Command>
 
       <div className="grid gap-4">
-        {filteredRepositories.map((repo: Repository) => (
+        {statusFilteredRepositories.map((repo: Repository) => (
           <Card key={repo.id} className="hover:shadow-md transition-shadow">
             <CardHeader>
               <div className="flex items-start justify-between">
@@ -137,14 +195,16 @@ const RepositoryPage = () => {
                     </a>
                   </Button>
                   <Button
-                    onClick={() => handleConnect(repo)}
-                    disabled={localConnectingId === repo.id || repo.isConnected}
+                    onClick={() => repo.isConnected ? handleDisconnect(repo) : handleConnect(repo)}
+                    disabled={localConnectingId === repo.id || localDisconnectingId === repo.id}
                     variant={repo.isConnected ? "outline" : "default"}
                   >
                     {localConnectingId === repo.id
                       ? "Connecting..."
+                      : localDisconnectingId === repo.id
+                      ? "Disconnecting..."
                       : repo.isConnected
-                      ? "Connected"
+                      ? "Disconnect"
                       : "Connect"}
                   </Button>
                 </div>
