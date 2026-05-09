@@ -19,11 +19,22 @@ import { getDashboardStats } from "@/module/dashboard/actions";
 import ContributionGraph from "@/module/dashboard/components/contribution-graph";
 import ActivityOverview from "@/module/dashboard/components/activity-overview";
 
+const LoadingDots = () => {
+  return (
+    <span className="inline-flex items-center gap-1">
+      <span className="h-1.5 w-1.5 rounded-full bg-foreground animate-bounce [animation-delay:0ms]" />
+      <span className="h-1.5 w-1.5 rounded-full bg-foreground animate-bounce [animation-delay:150ms]" />
+      <span className="h-1.5 w-1.5 rounded-full bg-foreground animate-bounce [animation-delay:300ms]" />
+    </span>
+  );
+};
+
 const MainPage = () => {
   const { data: session } = useSession();
   const { data: stats, isLoading } = useQuery({
     queryKey: ["dashboard-stats"],
     queryFn: async () => await getDashboardStats(),
+    staleTime: 1000 * 60 * 2,
     refetchOnWindowFocus: false,
   });
 
@@ -43,7 +54,7 @@ return (
           <GitBranch className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{isLoading ? "..." : stats?.totalRepos || 0}</div>
+          <div className="text-2xl font-bold">{isLoading ? <LoadingDots /> : stats?.totalRepos || 0}</div>
           <p className="text-xs text-muted-foreground">Connected repositories</p>
         </CardContent>
       </Card>
@@ -54,7 +65,7 @@ return (
           <GitCommit className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{isLoading ? "..." : stats?.totalCommits || 0}</div>
+          <div className="text-2xl font-bold">{isLoading ? <LoadingDots /> : stats?.totalCommits || 0}</div>
           <p className="text-xs text-muted-foreground">This year</p>
         </CardContent>
       </Card>
@@ -65,7 +76,7 @@ return (
           <GitPullRequest className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{isLoading ? "..." : stats?.totalPRs || 0}</div>
+          <div className="text-2xl font-bold">{isLoading ? <LoadingDots /> : stats?.totalPRs || 0}</div>
           <p className="text-xs text-muted-foreground">This year</p>
         </CardContent>
       </Card>
@@ -76,7 +87,7 @@ return (
           <MessageSquare className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{isLoading ? "..." : stats?.totalAIReviews || 0}</div>
+          <div className="text-2xl font-bold">{isLoading ? <LoadingDots /> : stats?.totalAIReviews || 0}</div>
           <p className="text-xs text-muted-foreground">Generated reviews</p>
         </CardContent>
       </Card>

@@ -3,6 +3,7 @@ import React from "react";
 import { ActivityCalendar } from "react-activity-calendar";
 import { getContributionData } from "../actions";
 import { useQuery } from "@tanstack/react-query";
+import { Clock3 } from "lucide-react";
 
 type ContributionDay = {
   date: string;
@@ -47,7 +48,10 @@ const ContributionGraph = () => {
   if (isLoading) {
     return (
       <div className="w-full flex flex-col items-center justify-center p-8">
-        <div className="animate-pulse text-muted-foreground">Loading contribution data...</div>
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Clock3 className="h-4 w-4 animate-spin" />
+          <span>Loading contribution data...</span>
+        </div>
       </div>
     );
   }

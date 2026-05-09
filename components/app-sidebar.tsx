@@ -142,8 +142,8 @@ export const AppSidebar = () => {
     return pathname === url || pathname.startsWith(`${url}/`);
   };
 
-  // Prevent layout shifts / context drops during Next.js routing & Auth checks
-  if (!mounted || !session) {
+  // Prevent hydration mismatch while keeping sidebar layout stable.
+  if (!mounted) {
     return (
       <Sidebar className="border-r-4 border-black dark:border-white bg-[#fdfaf2] dark:bg-zinc-950 font-sans shadow-[4px_0px_0_0_#000] dark:shadow-[4px_0px_0_0_#fff]">
         <div className="flex items-center justify-center h-full">
@@ -153,7 +153,7 @@ export const AppSidebar = () => {
     );
   }
 
-  const user = session.user;
+  const user = session?.user;
   const userName = user?.name || "GUEST";
   const userEmail = user?.email || "";
   const userInitials = getUserInitials(userName);

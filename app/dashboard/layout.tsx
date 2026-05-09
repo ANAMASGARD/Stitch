@@ -1,12 +1,14 @@
-import React from 'react'
+import React, { Suspense } from 'react'
 import { SidebarProvider,SidebarInset , SidebarTrigger } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/app-sidebar"
 import { requireAuth } from '@/module/auth/utils/auth-utils'
 
-const DashboardLayout = async (
-    { children }: { children: React.ReactNode }
-) => {
-   await requireAuth()
+const DashboardLayoutContent = async ({
+  children,
+}: {
+  children: React.ReactNode;
+}) => {
+  await requireAuth()
   return (
     <SidebarProvider>
       <AppSidebar />
@@ -23,4 +25,12 @@ const DashboardLayout = async (
   )
 }
 
-export default DashboardLayout
+const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
+  return (
+    <Suspense fallback={null}>
+      <DashboardLayoutContent>{children}</DashboardLayoutContent>
+    </Suspense>
+  )
+}
+
+export default DashboardLayout 

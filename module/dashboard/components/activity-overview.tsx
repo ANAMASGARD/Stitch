@@ -14,6 +14,7 @@ import {
 } from "recharts";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/retroui/Card";
 import { getMonthlyActivity } from "@/module/dashboard/actions";
+import { Clock3 } from "lucide-react";
 
 type MonthlyActivityPoint = {
   name: string;
@@ -100,7 +101,10 @@ const ActivityOverview = () => {
       <CardContent className="pt-0">
         {isLoading ? (
           <div className="flex h-[320px] items-center justify-center text-sm text-muted-foreground">
-            Loading activity overview...
+            <div className="flex items-center gap-2">
+              <Clock3 className="h-4 w-4 animate-spin" />
+              <span>Loading activity overview...</span>
+            </div>
           </div>
         ) : (
           <div className="h-[320px] w-full">

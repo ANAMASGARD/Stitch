@@ -1,11 +1,11 @@
-import { auth } from "@/lib/auth";
-import { headers } from "next/headers";
+import { Suspense } from "react";
 import { LandingHero } from "@/module/landing/components/landing-hero";
+import { HomeHeroWithSession } from "@/module/landing/components/home-hero-with-session";
 
-export default async function Home() {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-
-  return <LandingHero session={session} />;
+export default function Home() {
+  return (
+    <Suspense fallback={<LandingHero session={null} />}>
+      <HomeHeroWithSession />
+    </Suspense>
+  );
 }
