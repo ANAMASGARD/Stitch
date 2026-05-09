@@ -213,58 +213,131 @@ export async function getRepositories(page: number = 1, perPage: number = 10) {
   return data;
 }
 
-export async function createWebhook(owner: string, repo: string) {
-  const token = await getGithubToken();
-  const octokit = new Octokit({ auth: token });
-  const webhookUrl = `${process.env.NEXT_PUBLIC_APP_BASE_URL}/api/webhooks/github`;
+function assertRepositoryCoordinates(owner: string, repo: string) {
+    const normalizedOwner = owner?.trim();
+    const normalizedRepo = repo?.trim();
 
-  const { data: hooks } = await octokit.rest.repos.listWebhooks({
-    owner,
-    repo,
-  });
-
-  const existingHook = hooks.find((hook) => hook.config.url === webhookUrl);
-  if (existingHook) {
-    return existingHook;
-  }
-
-  const { data } = await octokit.rest.repos.createWebhook({
-    owner,
-    repo,
-    config: {
-      url: webhookUrl,
-      content_type: "json",
-    },
-    events: ["pull_request"],
-  });
-
-  return data;
-}
-
-export async function deleteWebhook(owner: string, repo: string) {
-  const token = await getGithubToken();
-  const octokit = new Octokit({ auth: token });
-  const webhookUrl = `${process.env.NEXT_PUBLIC_APP_BASE_URL}/api/webhooks/github`;
-
-  try {
-    const { data: hooks } = await octokit.rest.repos.listWebhooks({
-      owner,
-      repo,
-    });
-
-    const hookToDelete = hooks.find((hook) => hook.config.url === webhookUrl);
-
-    if (hookToDelete) {
-      await octokit.rest.repos.deleteWebhook({
-        owner,
-        repo,
-        hook_id: hookToDelete.id,
-      });
+    if (!normalizedOwner || !normalizedRepo) {
+        throw new Error(
+            `Invalid repository coordinates: owner="${owner ?? ""}", repo="${repo ?? ""}"`
+        );
     }
 
-    return { success: true, message: "Webhook deleted successfully" };
-  } catch (error) {
-    console.error("Error deleting webhook:", error);
-    return { success: false, message: "Failed to delete webhook" };
-  }
+    return {
+        owner: normalizedOwner,
+        repo: normalizedRepo,
+    };
+}
+
+export const createWebhook = async (owner: string, repo: string) => {
+    const coordinates = assertRepositoryCoordinates(owner, repo);
+    const token = await getGithubToken();
+    
+    const octokit = new Octokit({ auth: token });
+    const webhookUrl = `${process.env.NEXT_PUBLIC_APP_BASE_URL}/api/webhooks/github`;
+    
+    const { data: hooks } = await octokit.rest.repos.listWebhooks({
+        owner: coordinates.owner,
+        repo: coordinates.repo,
+    });
+    
+    const existingHook = hooks.find(hook => hook.config.url === webhookUrl);
+    if (existingHook) {
+        return existingHook;
+    }
+    
+    const { data } = await octokit.rest.repos.createWebhook({
+        owner: coordinates.owner,
+        repo: coordinates.repo,
+        config: {
+            url: webhookUrl,
+            content_type: "json",
+        },
+        events: ["pull_request"],
+    });
+    
+    return data;
+};
+
+export const deleteWebhook = async (owner: string, repo: string) => {
+    const coordinates = assertRepositoryCoordinates(owner, repo);
+    const token = await getGithubToken();
+    const octokit = new Octokit({ auth: token });
+    const webhookUrl = `${process.env.NEXT_PUBLIC_APP_BASE_URL}/api/webhooks/github`;
+  
+    try {
+      const { data: hooks } = await octokit.rest.repos.listWebhooks({
+        owner: coordinates.owner,
+        repo: coordinates.repo,
+      });
+  
+      const hookToDelete = hooks.find((hook) => hook.config.url === webhookUrl);
+  
+      if (hookToDelete) {
+        await octokit.rest.repos.deleteWebhook({
+          owner: coordinates.owner,
+          repo: coordinates.repo,
+          hook_id: hookToDelete.id,
+        });
+      }
+  
+      return { success: true, message: "Webhook deleted successfully" };
+    } catch (error) {
+      console.error("Error deleting webhook:", error);
+      return { success: false, message: "Failed to delete webhook" };
+    }
+  };
+export async function getRepoFileContent(
+    token: string,
+    owner: string,
+    repo: string,
+    path: string = ""
+) : Promise<{ path: string, content: string }[]> {
+    const coordinates = assertRepositoryCoordinates(owner, repo);
+    const octokit = new Octokit({ auth: token });
+    const { data } = await octokit.rest.repos.getContent({
+        owner: coordinates.owner,
+        repo: coordinates.repo,
+        path,
+    });
+    if (!Array.isArray(data)) {
+        if (data.type === "file" && data.content) {
+            return[{
+                path: data.path,
+                content: Buffer.from(data.content, "base64").toString("utf-8"),
+            }];
+            
+        }
+        return [];
+    }
+    let files: { path: string, content: string }[] = [];
+    for(const item of data){
+        if(item.type === "file"){
+            const {data:fileData} = await octokit.rest.repos.getContent({
+                owner: coordinates.owner,
+                repo: coordinates.repo,
+                path:item.path
+            })
+            if (!Array.isArray(fileData) && fileData.type === "file" && fileData.content) {
+                // Filter out non-code files if needed (images, etc.)
+                // For now, let's include everything that looks like text
+                if (!item.path.match(/\.(png|jpg|jpeg|gif|svg|ico|pdf|zip|tar|gz)$/i)) {
+                    files.push({
+                        path: item.path,
+                        content: Buffer.from(fileData.content, "base64").toString("utf-8"),
+                    });
+                }
+            }
+        } else if (item.type === "dir") {
+            const subFiles = await getRepoFileContent(
+                token,
+                coordinates.owner,
+                coordinates.repo,
+                item.path
+            )
+
+            files = files.concat(subFiles)
+        }
+    }
+    return files;
 }

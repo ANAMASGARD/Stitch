@@ -1,6 +1,7 @@
 "use server";
 import prisma from "@/lib/db";
 import { auth } from "@/lib/auth";
+import { inngest } from "@/inngest/client";
 import { getRepositories, createWebhook } from "@/module/github/lib/github";
 import { headers } from "next/headers";
 
@@ -23,6 +24,7 @@ export const fetchRepositories = async (page: number = 1, pageNumber: number = 1
 
         return githubRepos.map((repo) => ({
             ...repo,
+            topics: repo.topics ?? [],
             isConnected: connectedRepoIds.has(BigInt(repo.id))
         }));
 }
@@ -36,18 +38,25 @@ export const connectRepository = async (owner: string, repo: string, githubId: n
         throw new Error("Unauthorized");
     }
 
+    const normalizedOwner = owner?.trim();
+    const normalizedRepo = repo?.trim();
+
+    if (!normalizedOwner || !normalizedRepo) {
+        throw new Error(`Invalid repository: owner="${owner ?? ""}", repo="${repo ?? ""}"`);
+    }
+
     // TODO: CHECK IF USER CAN CONNECT MORE REPO
 
-    const webhook = await createWebhook(owner, repo);
+    const webhook = await createWebhook(normalizedOwner, normalizedRepo);
 
     if (webhook) {
         await prisma.repository.create({
             data: {
                 githubId: BigInt(githubId),
-                name: repo,
-                owner,
-                fullName: `${owner}/${repo}`,
-                url: `https://github.com/${owner}/${repo}`,
+                name: normalizedRepo,
+                owner: normalizedOwner,
+                fullName: `${normalizedOwner}/${normalizedRepo}`,
+                url: `https://github.com/${normalizedOwner}/${normalizedRepo}`,
                 userId: session.user.id
             }
         });
@@ -56,6 +65,19 @@ export const connectRepository = async (owner: string, repo: string, githubId: n
     // TODO: INCREMENT REPOSITORY COUNT FOR USAGE TRACKING
 
     // TODO: TRIGGER REPOSITORY INDEXING FOR THE RAG (FIRE AND FORGET)
+    try {
+        await inngest.send({
+            id: `repository.connected:${session.user.id}:${normalizedOwner}/${normalizedRepo}`,
+            name: "repository.connected",
+            data: {
+                owner: normalizedOwner,
+                repo: normalizedRepo,
+                userId: session.user.id
+            }
+        })
+    } catch (error) {
+        console.error("Failed to trigger repository indexing:", error);
+    }
 
     return webhook;
 };
