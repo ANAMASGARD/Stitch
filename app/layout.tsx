@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Archivo_Black, Space_Grotesk } from "next/font/google";
+import { Archivo_Black, Space_Grotesk, Instrument_Serif, Inter } from "next/font/google";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryProvider } from "@/components/providers/query-provider";
 import "./globals.css";
@@ -15,6 +15,20 @@ const space = Space_Grotesk({
   subsets: ["latin"],
   weight: "400",
   variable: "--font-sans",
+  display: "swap",
+});
+
+const instrumentSerif = Instrument_Serif({
+  subsets: ["latin"],
+  weight: "400",
+  variable: "--font-display",
+  display: "swap",
+});
+
+const inter = Inter({
+  subsets: ["latin"],
+  weight: ["400", "500", "700"],
+  variable: "--font-body",
   display: "swap",
 });
 
@@ -54,7 +68,7 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${archivoBlack.variable} ${space.variable} h-full antialiased`}
+      className={`${archivoBlack.variable} ${space.variable} ${instrumentSerif.variable} ${inter.variable} h-full antialiased`}
     >
       <head>
         <ThemeInitializerScript />
