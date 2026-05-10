@@ -1,0 +1,35 @@
+{
+  "name": "codereview",
+  "description": "Structured GitHub pull request code reviews (walkthrough, Mermaid diagram, summary, strengths, issues, suggestions, poem). Send a public github.com PR URL; optional Pinecone RAG when enabled.",
+  "version": "0.1.0",
+  "category": "developer-tools",
+  "tags": [
+    "code-review",
+    "github",
+    "pull-request",
+    "markdown",
+    "ai",
+    "rag-optional"
+  ],
+  "registry_url": "https://zns01.zynd.ai",
+  "server_host": "0.0.0.0",
+  "server_port": 5000,
+  "auth_mode": "permissive",
+  "entity_index": 0,
+  "capabilities": {
+    "streaming": true,
+    "pushNotifications": false,
+    "stateTransitionHistory": false
+  },
+  "skills": [
+    {
+      "id": "default",
+      "name": "codereview",
+      "description": "POST to /webhook/sync with JSON including github_url (https://github.com/owner/repo/pull/123), optional extra_instructions and use_rag (requires ENABLE_PUBLIC_RAG=true server-side).",
+      "tags": ["github", "pull-request"],
+      "examples": [
+        "{\"github_url\":\"https://github.com/microsoft/TypeScript/pull/1\",\"prompt\":\"Call out any breaking API changes.\"}"
+      ]
+    }
+  ]
+}

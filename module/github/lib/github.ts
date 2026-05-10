@@ -1,4 +1,4 @@
-import { Octokit } from "octokit";
+import { Octokit } from "@/module/github/lib/octokit";
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/db";
 import { headers } from "next/headers";
@@ -342,6 +342,100 @@ export async function getRepoFileContent(
     return files;
 }
 
+const PR_REVIEW_CONTEXT_MAX_CHARS = 28_000;
+
+/**
+ * Human-readable PR context beyond the raw patch: file list, submitted reviews,
+ * inline review comments, and issue-thread comments (truncated). Mirrors what
+ * agents often gather via GitHub MCP tools, for programmatic review prompts.
+ */
+async function buildGithubPrReviewContext(
+    octokit: InstanceType<typeof Octokit>,
+    owner: string,
+    repo: string,
+    prNumber: number,
+): Promise<string> {
+    const blocks: string[] = [];
+
+    const { data: files } = await octokit.rest.pulls.listFiles({
+        owner,
+        repo,
+        pull_number: prNumber,
+        per_page: 100,
+    });
+    const fileLines = files.slice(0, 80).map(
+        (f) =>
+            `- \`${f.filename}\` (${f.status}) +${f.additions}/-${f.deletions}`,
+    );
+    blocks.push(`## Changed files\n${fileLines.join("\n")}`);
+
+    try {
+        const { data: reviews } = await octokit.rest.pulls.listReviews({
+            owner,
+            repo,
+            pull_number: prNumber,
+            per_page: 40,
+        });
+        if (reviews.length) {
+            const lines = reviews.map((r) => {
+                const who = r.user?.login ?? "?";
+                const state = r.state ?? "?";
+                const body = (r.body ?? "").trim().slice(0, 900);
+                return `- **${who}** [${state}]: ${body || "(no body)"}`;
+            });
+            blocks.push(`## Submitted PR reviews\n${lines.join("\n")}`);
+        }
+    } catch {
+        /* optional */
+    }
+
+    try {
+        const { data: inline } = await octokit.rest.pulls.listReviewComments({
+            owner,
+            repo,
+            pull_number: prNumber,
+            per_page: 60,
+        });
+        if (inline.length) {
+            const lines = inline.map((c) => {
+                const path = c.path ?? "?";
+                const body = (c.body ?? "").trim().slice(0, 550);
+                return `- \`${path}\` (@${c.user?.login ?? "?"}): ${body}`;
+            });
+            blocks.push(`## Inline review comments\n${lines.join("\n")}`);
+        }
+    } catch {
+        /* optional */
+    }
+
+    try {
+        const { data: issueComments } = await octokit.rest.issues.listComments({
+            owner,
+            repo,
+            issue_number: prNumber,
+            per_page: 35,
+        });
+        if (issueComments.length) {
+            const lines = issueComments.map((c) => {
+                const who = c.user?.login ?? "?";
+                const body = (c.body ?? "").trim().slice(0, 700);
+                return `- **${who}**: ${body}`;
+            });
+            blocks.push(`## Issue / PR conversation\n${lines.join("\n")}`);
+        }
+    } catch {
+        /* optional */
+    }
+
+    let text = blocks.join("\n\n");
+    if (text.length > PR_REVIEW_CONTEXT_MAX_CHARS) {
+        text =
+            text.slice(0, PR_REVIEW_CONTEXT_MAX_CHARS) +
+            "\n\n… (GitHub context truncated for size)";
+    }
+    return text;
+}
+
 export async function getPullRequestDiff(
     token: string,
     owner: string,
@@ -365,10 +459,23 @@ export async function getPullRequestDiff(
         },
     });
 
+    let githubThreadContext = "";
+    try {
+        githubThreadContext = await buildGithubPrReviewContext(
+            octokit,
+            owner,
+            repo,
+            prNumber,
+        );
+    } catch {
+        githubThreadContext = "";
+    }
+
     return {
         title: pr.title,
         diff: diff as unknown as string,
         description: pr.body || "",
+        githubThreadContext,
     };
 }
 

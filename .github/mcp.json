@@ -1,0 +1,27 @@
+{
+  "mcpServers": {
+    "github": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-e",
+        "GITHUB_PERSONAL_ACCESS_TOKEN",
+        "ghcr.io/github/github-mcp-server"
+      ],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${env:GITHUB_READ_TOKEN}"
+      }
+    },
+    "zyndai": {
+      "command": "npx",
+      "args": ["-y", "zyndai-mcp-server@latest"],
+      "env": {
+        "ZYNDAI_REGISTRY_URL": "https://dns01.zynd.ai",
+        "ZYNDAI_PERSONA_PUBLIC_URL": "${env:ZYND_ENTITY_URL}",
+        "ZYNDAI_PAYMENT_PRIVATE_KEY": "${env:ZYNDAI_PAYMENT_PRIVATE_KEY}"
+      }
+    }
+  }
+}

@@ -1,0 +1,79 @@
+{
+  "protocolVersion": "0.3.0",
+  "name": "codereview",
+  "description": "Structured GitHub pull request code reviews (walkthrough, Mermaid diagram, summary, strengths, issues, suggestions, poem). Send a public github.com PR URL; optional Pinecone RAG when enabled.",
+  "version": "0.1.0",
+  "url": "https://uncut-parted-nearby.ngrok-free.dev/a2a/v1",
+  "preferredTransport": "JSONRPC",
+  "provider": {
+    "organization": "anamasgard",
+    "url": "https://zns01.zynd.ai"
+  },
+  "capabilities": {
+    "streaming": true,
+    "pushNotifications": false,
+    "stateTransitionHistory": false
+  },
+  "defaultInputModes": [
+    "text/plain",
+    "application/json"
+  ],
+  "defaultOutputModes": [
+    "text/plain",
+    "application/json"
+  ],
+  "skills": [
+    {
+      "id": "default",
+      "name": "codereview",
+      "description": "POST to /webhook/sync with JSON including github_url (https://github.com/owner/repo/pull/123), optional extra_instructions and use_rag (requires ENABLE_PUBLIC_RAG=true server-side).",
+      "tags": [
+        "github",
+        "pull-request"
+      ],
+      "examples": [
+        "{\"github_url\":\"https://github.com/microsoft/TypeScript/pull/1\",\"prompt\":\"Call out any breaking API changes.\"}"
+      ]
+    }
+  ],
+  "securitySchemes": {
+    "zyndSig": {
+      "type": "http",
+      "scheme": "ed25519-envelope",
+      "description": "Per-message Ed25519 signature in Message.metadata['x-zynd-auth']. See zynd-a2a-communication spec."
+    }
+  },
+  "security": [
+    {
+      "zyndSig": []
+    }
+  ],
+  "x-zynd": {
+    "version": 1,
+    "entityId": "zns:c1d940ce18dd5d3a7dd3292722b1d286",
+    "publicKey": "ed25519:gzcLZrwNpdPs38FEo2yMgyTrNR4XvTubDGgfGKhvOHk=",
+    "registry": "zns01.zynd.ai",
+    "status": "online",
+    "category": "developer-tools",
+    "tags": [
+      "code-review",
+      "github",
+      "pull-request",
+      "markdown",
+      "ai",
+      "rag-optional"
+    ],
+    "inputSchema": {},
+    "outputSchema": {},
+    "lastUpdatedAt": "2026-05-10T04:24:42.616Z"
+  },
+  "signatures": [
+    {
+      "protected": "eyJhbGciOiJFZERTQSIsInR5cCI6ImFnZW50LWNhcmQramNzK2p3cyJ9",
+      "signature": "MZGUzqOGL7C6_iOyOxoEjI93dpxirWvK_LUrVj8V635bR9LnZNUubcksMujwHSKmHyoKTAj2Hk5GUErL1TGKBQ",
+      "header": {
+        "kid": "ed25519:gzcLZrwNpdPs38FEo2yMgyTrNR4XvTubDGgfGKhvOHk="
+      }
+    }
+  ]
+}

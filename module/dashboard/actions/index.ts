@@ -7,7 +7,7 @@ import {
 } from "@/module/github/lib/github";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
-import { Octokit } from "octokit";
+import { Octokit } from "@/module/github/lib/octokit";
 
 type ContributionCalendarDay = {
   date: string;

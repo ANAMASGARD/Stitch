@@ -6,194 +6,134 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 # Stitch Agent Handbook
 
-This file is the persistent project memory for coding agents. It documents how the codebase is organized, what has been implemented, and how major flows work right now.
+Persistent guide for coding agents. Long-form onboarding, folder map, and **Zynd agent** details live in **`.github/copilot-instructions.md`**. Direction: **`.github/STEERING.md`**. Facts: **`.github/MEMORY.md`**.
 
-## Product Summary
+## Product summary
 
 Stitch is a Next.js App Router application for GitHub-aware developer workflows:
-- user authentication
-- dashboard + settings views
-- repository connect/disconnect
-- GitHub API integration (Octokit)
-- async indexing pipeline using Inngest
-- RAG indexing + retrieval using Pinecone and Gemini embeddings
-- AI-powered code review for GitHub pull requests
 
-## 🛠️ Tech Stack & Architecture
-- **Framework:** Next.js 16.2.3 App Router (Turbopack enabled)
-- **Styling:** Tailwind CSS v4
-  - *Note for Agents:* Tailwind v4 uses the `@theme` block in `app/globals.css` instead of a standalone `tailwind.config.js`. CSS variables control the entire design system. Do not look for or try to create tailwind config files.
-- **UI Foundations:**
-  - `shadcn/ui` configured (`components.json` is present, `components/ui/` for standard elements with `radix-nova` style).
-  - **RetroUI**: Custom pre-built retro-style components reside in `components/retroui/` (e.g., Accordion, Dialog, Input, Tab, etc.). Favor leveraging these over standard ui when writing visual elements.
-- **State/Primitives:** Radix UI primitives (`@radix-ui/react-*`), cmkd, Embla Carousel.
+- User authentication (better-auth)
+- Dashboard + settings + repositories + reviews
+- GitHub API integration (Octokit core stack in **`module/github/lib/octokit.ts`**)
+- Async indexing with **Inngest** (`repository.connected` → Pinecone)
+- RAG: **`module/ai/lib/rag.ts`** + **`lib/pinecone.ts`**
+- AI PR review: dashboard path via Inngest + shared **`module/ai/lib/pr-review-llm.ts`**
+- **Zynd network agent** **`codereview`**: root **`agent.ts`**, schemas **`payload.ts`**, metadata **`agent.config.json`** — public webhook + registry listing ([Zynd registry](https://www.zynd.ai/registry))
 
-## 🎨 Design System (RetroUI)
-Maintain the designated retro aesthetic unconditionally across all new features.
-- **Typography:**
-  - Headings: `Archivo Black` via `next/font` (CSS variable: `--font-head`)
-  - Body/Sans: `Space Grotesk` via `next/font` (CSS variable: `--font-sans`)
-- **Colors & Aesthetics:**
-  - Primary Theme: Vibrant Yellow (`#ffdb33`), stark whites, and heavy blacks (`#000`).
-  - Edges: Zero border radius (`--radius: 0`) for sharp, blocky box elements.
-  - Shadows: Hard, distinct shadows using border logic (e.g., `--shadow: 3px 3px 0 0 var(--border)`).
-  - Focus/Rings (`--ring`): Mapped to the primary yellow to match the retro look and ensure Tailwind v4 compiler compatibility with `outline-ring/50`.
+## What we have achieved (recent)
 
-## Current Stack
+- **`generatePrReviewMarkdown`** / **`generateFreeformReviewMarkdown`** centralized in **`module/ai/lib/pr-review-llm.ts`**; **`inngest/functions/review.ts`** uses the same contract as the Zynd agent.
+- **`getPullRequestDiff`** enriches prompts with GitHub PR metadata (files, reviews, inline comments, issue comments) when generating reviews.
+- **Zynd agent** validates **`payload.ts`** (`RequestPayload.safeParse` after JSON-in-content merge); **`ENABLE_PUBLIC_RAG`** gates Pinecone on public calls; RAG loaded **only when** `use_rag` + env allow (lazy `import()` — no `server-only` conflict with `npx zynd agent run`).
+- **Octokit:** Repo uses **`@octokit/core` + plugins** via **`module/github/lib/octokit.ts`** instead of the **`octokit`** npm meta-package (fixes **`tsx` / Node** resolution issues with `@octokit/app`).
+- **MCP:** Canonical **`/.github/mcp.json`** (GitHub MCP + **zyndai-mcp-server**). Cursor: copy to **`.cursor/mcp.json`** or merge into user config.
+- **Docs:** **`docs/zynd-agent-env.md`** — env, **`GET /health`**, **`/.well-known/agent.json`**, **`POST /webhook/sync`**, wire-debug **`ZYND_DEBUG_WIRE`**.
 
-## 🕰️ Development History Log
-- **Phase 1 (Initialization):** Scaffolded base Next.js 16.2.3 app with Tailwind v4 and React 19.
-- **Phase 2 (Design Setup):**
-  - Applied Archivo Black and Space Grotesk mapping globally via `app/layout.tsx`.
-  - Replaced the default CSS theme loop with custom RetroUI variables in `globals.css` (`@theme`, `:root`, `.dark`).
-- **Phase 3 (Tailwind v4 Fixs):**
-  - Resolved a fatal `outline-ring/50` evaluation build error in Tailwind CSS v4. The error was fixed by explicitly defining `--color-ring` in `@theme` and mapping `--ring` tokens inside `:root`/`.dark` to ensure legacy standard classes compiled correctly.
+## Tech stack
 
-- Framework: Next.js `16.2.3` (App Router)
-- Runtime/UI: React `19`, TypeScript, Tailwind CSS v4
-- Auth: `better-auth`
-- Database ORM: Prisma (`@prisma/client` + `@prisma/adapter-pg`)
-- GitHub API: `octokit`
-- Async jobs: `inngest`
-- AI/RAG: `ai` SDK + `@ai-sdk/google` + Pinecone
+- **Framework:** Next.js **16.2.x** App Router (Turbopack in dev)
+- **Styling:** Tailwind CSS v4 — tokens in **`app/globals.css`** (`@theme`); no standalone `tailwind.config.js`
+- **UI:** **RetroUI** in **`components/retroui/`** first; **`components/ui/`** (shadcn-style) secondary
+- **Auth:** better-auth
+- **Database:** Prisma + Postgres (`@prisma/client` + adapter)
+- **GitHub:** **`module/github/lib/octokit.ts`** + **`module/github/lib/github.ts`**
+- **Jobs:** Inngest
+- **AI:** `ai` SDK + `@ai-sdk/google` + `@openrouter/ai-sdk-provider`
+- **Zynd:** `zyndai` SDK (**`agent.ts`**)
 
-## Non-Negotiable Styling Rules
+## Design system (RetroUI)
 
-The app uses a retro visual system:
-- Keep sharp corners (`--radius: 0`)
-- Keep hard/offset shadow style (no soft modern blur aesthetic)
-- Use design tokens in `app/globals.css` `@theme` (Tailwind v4 convention)
-- Reuse `components/retroui/*` first before introducing new patterns
+- Typography: **Archivo Black** (`--font-head`), **Space Grotesk** (`--font-sans`)
+- `--radius: 0`, hard shadows, primary **`#ffdb33`**
+- Use **`components/retroui/*`** for new UI
 
-## Project Structure (Code Map)
+## Project structure (code map)
 
-Top-level map:
+| Area | Contents |
+|------|----------|
+| `app/` | Routes, layouts, API handlers |
+| `module/` | Domain: `ai`, `auth`, `dashboard`, `github`, `repository`, `review`, `settings`, `landing` |
+| `inngest/` | Client + **`functions/`** (`indexRepo`, **`generateReview`**, …) |
+| `components/` | `retroui/`, `ui/`, `ai-elements/`, `providers/` |
+| `lib/` | `db`, `auth`, `pinecone`, utilities |
+| `prisma/` | Schema + migrations |
+| Root | **`agent.ts`**, **`payload.ts`**, **`agent.config.json`** — Zynd **`codereview`** agent only |
 
-- `app/`: routes, layouts, and API handlers
-- `module/`: domain modules (auth, dashboard, github, repository, settings, ai)
-- `inngest/`: Inngest client + background functions
-- `components/`: shared UI (`retroui` and `ui`)
-- `lib/`: infrastructure clients (`db`, `auth`, `pinecone`, utils)
-- `prisma/`: schema + migrations
+### Routing (`app/`)
 
-Detailed map:
+- `app/page.tsx` — landing
+- `app/(auth)/login/page.tsx` — login
+- `app/dashboard/*` — dashboard shell, repos, reviews, settings
+- `app/api/auth/[...all]/route.ts` — Better Auth
+- `app/api/webhooks/github/route.ts` — GitHub webhook (minimal)
+- `app/api/inngest/route.ts` — Inngest `serve(...)`
 
-### Routing Layer (`app/`)
+### Repository (`module/repository/`)
 
-- `app/page.tsx`: landing/root page
-- `app/(auth)/login/page.tsx`: login page
-- `app/dashboard/layout.tsx`: dashboard shell
-- `app/dashboard/page.tsx`: dashboard home
-- `app/dashboard/repositories/page.tsx`: repositories page
-- `app/dashboard/settings/page.tsx`: settings page
-- `app/api/auth/[...all]/route.ts`: auth routes
-- `app/api/webhooks/github/route.ts`: GitHub webhook endpoint (currently minimal handling)
-- `app/api/inngest/route.ts`: Inngest handler endpoint (`serve(...)`)
+- **`actions/index.ts`**: fetch/connect/disconnect; **`repository.connected`** for indexing
 
-### Repository Domain (`module/repository/`)
+### GitHub (`module/github/`)
 
-- `module/repository/actions/index.ts`
-  - `fetchRepositories(page, pageNumber)`
-    - fetches GitHub repos
-    - marks repos as connected if present in DB
-  - `connectRepository(owner, repo, githubId)`
-    - validates session + normalizes owner/repo
-    - creates GitHub webhook
-    - persists repository row in DB
-    - fires Inngest event `repository.connected` (fire-and-forget) for indexing
-  - `disconnectRepository(githubId)`
-    - deletes repository rows by `githubId` + `userId`
-- `module/repository/hooks/*`: query/mutation hooks for connect/disconnect/fetch
-- `module/repository/components/repository-skeleton.tsx`: loading UI
+- **`lib/octokit.ts`**: shared **`Octokit`** (REST + GraphQL + pagination + retry + throttling)
+- **`lib/github.ts`**: token helpers, GraphQL contributions, repos, webhooks, **`getRepoFileContent`**, **`getPullRequestDiff`**, **`postReviewComment`**
 
-### GitHub Integration (`module/github/`)
+### Background jobs (`inngest/`)
 
-- `module/github/lib/github.ts`
-  - token/session resolver: `getGithubToken()`
-  - contributions:
-    - `fetchUserContribution(...)`
-    - `fetchGithubContributionSummary(...)`
-  - repositories: `getRepositories(...)`
-  - webhook lifecycle:
-    - `createWebhook(owner, repo)`
-    - `deleteWebhook(owner, repo)`
-  - repository file ingestion:
-    - `getRepoFileContent(token, owner, repo, path?)`
-    - supports:
-      - direct single-file content
-      - folder traversal
-      - recursive descent into subdirectories
-      - simple binary extension filtering before decoding base64 content
+- **`indexRepo`** — `repository.connected` → fetch files → **`indexCodebase`**
+- **`generateReview`** — `pr.review.requested` → diff + optional RAG → **`generatePrReviewMarkdown`** → comment + **`Review`** row
 
-### Background Jobs (`inngest/`)
+### AI (`module/ai/`)
 
-- `inngest/client.ts`: Inngest client initialization
-- `inngest/functions/index.ts`:
-  - `indexRepo` function triggered by `repository.connected`
-  - flow:
-    - validate payload (`owner`, `repo`, `userId`)
-    - load GitHub account access token from Prisma
-    - fetch repository files via `getRepoFileContent(...)`
-    - index files via `indexCodebase(...)`
-    - return indexing summary
-- `app/api/inngest/route.ts` registers `indexRepo` with `serve(...)`
+- **`lib/rag.ts`** — chunk, embed, Pinecone upsert/query (**no `server-only`** — usable from Zynd process when dynamically imported)
+- **`lib/pr-review-llm.ts`** — shared markdown review generation
 
-### AI + RAG (`module/ai/`, `lib/pinecone.ts`)
+### Zynd agent (root)
 
-- `lib/pinecone.ts`
-  - initializes Pinecone client
-  - uses index name `stitch-ai`
-- `module/ai/lib/rag.ts`
-  - `indexCodebase(repoId, files)`:
-    - formats content
-    - chunks files (size/overlap strategy)
-    - embeds using Gemini embedding model
-    - upserts vectors to Pinecone with metadata
-  - `generateEmbedding(text)` for retrieval query embedding
-  - `retrieveContext(query, repoId, topK?)` for semantic context lookup
+| File | Purpose |
+|------|---------|
+| **`agent.config.json`** | Agent identity for registry: name **`codereview`**, tags, **`registry_url`**, skills |
+| **`payload.ts`** | Zod **`RequestPayload`** / **`ResponsePayload`** → published **`input_schema` / `output_schema`** |
+| **`agent.ts`** | **`ZyndAIAgent`**: **`onMessage`** returns **`{ response }`**; **`mergeJsonContentString`** for judge wire formats |
 
-### Auth + Core Infra
+## End-to-end flows
 
-- `lib/auth.ts`: auth server setup
-- `lib/auth-client.ts`: auth client setup
-- `lib/db.ts`: Prisma DB client
-- `prisma/schema.prisma` models:
-  - `User`
-  - `Repository` (connected repos table)
-  - `Session`
-  - `Account` (stores provider tokens, incl. GitHub access token)
-  - `Verification`
+### Connect repo → index
 
-## End-to-End Flow (Implemented)
+1. UI → **`connectRepository`**
+2. Webhook + DB + **`repository.connected`**
+3. **Inngest** fetches files → **RAG** → Pinecone
 
-### Connect Repository -> Index Codebase
+### Dashboard PR review
 
-1. User triggers connect from repository UI.
-2. `connectRepository(...)` creates webhook + stores repository in DB.
-3. `connectRepository(...)` sends Inngest event `repository.connected`.
-4. `indexRepo` Inngest function receives event.
-5. Function loads user GitHub token from `Account`.
-6. Function fetches repo files recursively via GitHub API.
-7. Function chunks + embeds + upserts to Pinecone via `indexCodebase`.
+1. **`module/ai/actions`** queues **`pr.review.requested`**
+2. **`inngest/functions/review.ts`**: OAuth token → **`getPullRequestDiff`** → optional **`retrieveContext`** → **`generatePrReviewMarkdown`** → GitHub comment
 
-## Important Environment Expectations
+### Zynd public agent
 
-The following are used in code and expected at runtime:
-- `PINECONE_DB_API_KEY`
-- `NEXT_PUBLIC_APP_BASE_URL`
-- database connection env for Prisma/PG
-- auth-related secrets/env expected by Better Auth setup
+1. Caller **`POST {{ZYND_ENTITY_URL}}/webhook/sync`** with JSON per **`payload.ts`**
+2. **`GITHUB_READ_TOKEN`** fetches PR when **`github_url`** present
+3. Returns markdown **`response`**; optional RAG behind **`ENABLE_PUBLIC_RAG`**
 
-## Known Status / Gaps
+## Environment expectations
 
-- `app/api/webhooks/github/route.ts` currently acknowledges events, with TODO for full processing.
-- Repository usage quotas/tracking are still TODO in `connectRepository`.
-- RAG retrieval exists, but chat/assistant orchestration layer is not yet wired in this map.
+- **`PINECONE_DB_API_KEY`**, **`NEXT_PUBLIC_APP_BASE_URL`**
+- DB URL for Prisma / Postgres
+- Better Auth secrets
+- GitHub OAuth (dashboard)
+- LLM: **`OPENROUTER_API_KEY`**, **`GOOGLE_GENERATIVE_AI_API_KEY`**
+- Zynd agent: **`ZYND_AGENT_KEYPAIR_PATH`**, **`ZYND_ENTITY_URL`**, **`GITHUB_READ_TOKEN`** (PR URL mode)
 
-## Agent Operating Guidelines For This Repo
+## Known gaps
 
-1. Validate and normalize `owner/repo` inputs before GitHub API calls.
-2. Keep async heavy work in Inngest functions, not in request handlers.
-3. For RAG updates, preserve chunking/embedding metadata compatibility.
-4. Prefer extending existing module boundaries instead of creating cross-cutting utility sprawl.
-5. Keep UI consistent with RetroUI tokens/components.
+- **`app/api/webhooks/github/route.ts`** — minimal processing
+- Repository usage quotas — not fully enforced in **`connectRepository`**
+- Subscription tier / **UserUsage** — steering goal; current Prisma schema is User + Repository + Review only (see **`MEMORY.md`**)
+
+## Agent operating guidelines
+
+1. Normalize **`owner/repo`** before GitHub API calls.
+2. Keep heavy async work in **Inngest**, not in thin API routes.
+3. Preserve RAG chunk/metadata compatibility when editing **`rag.ts`**.
+4. Extend **`module/*`** boundaries; avoid utility sprawl.
+5. Keep UI aligned with **RetroUI** tokens.
+6. Do not reintroduce the **`octokit`** npm package at repo root — use **`@/module/github/lib/octokit`**.

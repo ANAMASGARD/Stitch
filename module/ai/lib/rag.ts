@@ -1,5 +1,3 @@
-import "server-only";
-
 import { pineconeIndex } from "@/lib/pinecone";
 import { embed, embedMany } from "ai";
 import { google } from "@ai-sdk/google";
