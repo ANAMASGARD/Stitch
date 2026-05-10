@@ -1,3 +1,5 @@
+**Demo video:** [Stitch AI on YouTube](https://youtu.be/NrnnOHNwo98)
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 **Stitch:** copy [`.env.example`](.env.example) to `.env`. Operators set `GITHUB_WEBHOOK_SECRET` once (self-generated, e.g. `openssl rand -hex 32`); it is never shown to dashboard users. Agent-oriented docs: [`AGENTS.md`](AGENTS.md), [`.github/MEMORY.md`](.github/MEMORY.md), [`.github/copilot-instructions.md`](.github/copilot-instructions.md). Dashboard: repositories, reviews (PR + issue automation), **pull-requests** (Stitch auto-PRs), settings (GitHub scope refresh).

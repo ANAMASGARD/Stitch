@@ -6,7 +6,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 # Stitch Agent Handbook
 
-Persistent guide for coding agents. Long-form onboarding, folder map, and **Zynd agent** details live in **`.github/copilot-instructions.md`**. Direction: **`.github/STEERING.md`**. Facts: **`.github/MEMORY.md`**.
+Persistent guide for coding agents. Long-form onboarding, folder map, and **Zynd agent** details live in **`.github/copilot-instructions.md`**. Direction: **`.github/STEERING.md`**. Facts: **`.github/MEMORY.md`**. Repo overview demo: **[Stitch AI on YouTube](https://youtu.be/NrnnOHNwo98)** (linked from **`README.md`**).
 
 ## Product summary
 
