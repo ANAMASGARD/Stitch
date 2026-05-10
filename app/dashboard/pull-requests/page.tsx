@@ -131,7 +131,7 @@ export default function PullRequestsPage() {
                       <CardDescription className="flex flex-wrap items-center gap-x-3 gap-y-1">
                         <span className="inline-flex items-center gap-1">
                           <User className="h-3.5 w-3.5" />
-                          @{row.commandCommentAuthor}
+                          Stitch AI
                         </span>
                         <span>Issue #{row.issueNumber}</span>
                         {row.branchName ? (

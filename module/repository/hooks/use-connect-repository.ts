@@ -15,7 +15,9 @@ export const useConnectRepository = () => {
             queryClient.invalidateQueries({ queryKey: ["repositories"] });
         },
         onError: (error) => {
-            toast.error("Failed to connect repository");
+            const message =
+                error instanceof Error ? error.message : "Failed to connect repository";
+            toast.error(message);
             console.error(error);
         }
     });

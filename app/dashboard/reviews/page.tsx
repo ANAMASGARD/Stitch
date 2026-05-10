@@ -143,7 +143,7 @@ export default function ReviewsPage() {
                           {r.repository.fullName} · #{r.issueNumber}
                         </div>
                         <div className="text-muted-foreground">
-                          {r.status} · @{r.commandCommentAuthor}
+                          {r.status} · Stitch AI
                           {r.prUrl ? (
                             <>
                               {" "}

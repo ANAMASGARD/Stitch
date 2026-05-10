@@ -514,7 +514,7 @@ export async function postReviewComment(
         owner,
         repo,
         issue_number: prNumber,
-        body: `## AI Code Review\n\n${review}\n\n--\n*Powered by Stitch*`,
+        body: `## Stitch AI · Code review\n\n${review}\n\n--\n*Powered by Stitch AI*`,
     });
 }
 

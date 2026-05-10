@@ -1,4 +1,14 @@
-**Demo video:** [Stitch AI on YouTube](https://youtu.be/NrnnOHNwo98)
+<div align="center">
+
+# Stitch AI — demo walkthrough
+
+[![Stitch AI — click to watch on YouTube](https://img.youtube.com/vi/LgnPk0i05wU/maxresdefault.jpg)](https://youtu.be/LgnPk0i05wU?si=eO8ocnSHS2ATWhQq)
+
+### [▶ Watch on YouTube](https://youtu.be/LgnPk0i05wU?si=eO8ocnSHS2ATWhQq)
+
+</div>
+
+---
 
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 

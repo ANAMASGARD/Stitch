@@ -55,16 +55,32 @@ export const connectRepository = async (owner: string, repo: string, githubId: n
     });
 
     if (!existingRepository) {
-        await prisma.repository.create({
-            data: {
-                githubId: BigInt(githubId),
-                name: normalizedRepo,
-                owner: normalizedOwner,
-                fullName: `${normalizedOwner}/${normalizedRepo}`,
-                url: `https://github.com/${normalizedOwner}/${normalizedRepo}`,
-                userId: session.user.id
+        try {
+            await prisma.repository.create({
+                data: {
+                    githubId: BigInt(githubId),
+                    name: normalizedRepo,
+                    owner: normalizedOwner,
+                    fullName: `${normalizedOwner}/${normalizedRepo}`,
+                    url: `https://github.com/${normalizedOwner}/${normalizedRepo}`,
+                    userId: session.user.id,
+                },
+            });
+        } catch (e: unknown) {
+            const code =
+                e &&
+                typeof e === "object" &&
+                "code" in e &&
+                typeof (e as { code: unknown }).code === "string"
+                    ? (e as { code: string }).code
+                    : undefined;
+            if (code === "P2002") {
+                throw new Error(
+                    "This repository is already connected for your account, or another row conflicts. Refresh the page.",
+                );
             }
-        });
+            throw e;
+        }
     }
 
     let webhookConfigured = false;

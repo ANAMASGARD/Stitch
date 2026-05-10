@@ -79,14 +79,28 @@ export const analyzeIssue = inngest.createFunction(
     });
 
     if (chunks.length < MIN_CONTEXT_CHUNKS) {
+      if (chunks.length === 0) {
+        await step.run("queue-reindex-for-triage", async () => {
+          await inngest.send({
+            id: `repository.connected:reindex-triage:${userId}:${owner}/${repo}`,
+            name: "repository.connected",
+            data: { owner, repo, userId },
+          });
+        });
+      }
       await step.run("comment-insufficient-context", async () => {
+        const reindexNote =
+          chunks.length === 0
+            ? `\n\n**Stitch AI** queued a full re-index for this repository. Open the Inngest dashboard, wait until the \`index-repo\` run finishes, then add a short comment on this issue to re-run triage.`
+            : `\n\nIf you already connected the repo, wait for indexing to finish (\`index-repo\` in Inngest), or disconnect and reconnect on the Stitch dashboard to trigger a new index.`;
         await postIssueComment(
           token,
           owner,
           repo,
           issueNumber,
-          `**Stitch** could not find enough indexed context in Pinecone for \`${owner}/${repo}\` (found ${chunks.length} chunks; need at least ${MIN_CONTEXT_CHUNKS}). ` +
-            `Try reconnecting or re-indexing the repository, then open a new issue or edit this one.`,
+          `**Stitch AI** could not find enough indexed context in Pinecone for \`${owner}/${repo}\` (found ${chunks.length} chunks; need at least ${MIN_CONTEXT_CHUNKS}). ` +
+            `Confirm **Next.js** and **Inngest** are running, your **ngrok** tunnel targets the same port as the app, and **Pinecone** env keys match the index used for chat.` +
+            reindexNote,
         );
       });
 
@@ -133,8 +147,8 @@ export const analyzeIssue = inngest.createFunction(
 
     await step.run("post-triage-comment", async () => {
       const commentBody =
-        `### Stitch triage\n\n${triage.commentMarkdown}\n\n` +
-        `—\n_Classification: **${triage.classification}** · Powered by Stitch_`;
+        `### Stitch AI · Issue triage\n\n${triage.commentMarkdown}\n\n` +
+        `—\n_Classification: **${triage.classification}** · Powered by Stitch AI_`;
       await postIssueComment(token, owner, repo, issueNumber, commentBody);
     });
 
@@ -253,7 +267,7 @@ export const createIssueFixPullRequest = inngest.createFunction(
           owner,
           repo,
           issueNumber,
-          `**Stitch** already opened a pull request for this issue: ${existingDone.prUrl ?? "(see dashboard)"}. ` +
+          `**Stitch AI** already opened a pull request for this issue: ${existingDone.prUrl ?? "(see dashboard)"}. ` +
             `Override flows like \`/stitch fix --again\` are not supported in v1.`,
         );
       });
@@ -273,7 +287,7 @@ export const createIssueFixPullRequest = inngest.createFunction(
     if (!hasStitchFixCommand(commandCommentBody ?? "")) {
       await markFailed(
         "not_stitch_fix_command",
-        "**Stitch** ignored this run: the triggering comment must contain `/stitch fix`.",
+        "**Stitch AI** ignored this run: the triggering comment must contain `/stitch fix`.",
       );
       return { skipped: "no_command" as const };
     }
@@ -294,7 +308,7 @@ export const createIssueFixPullRequest = inngest.createFunction(
     if (!permission || !WRITE_PERMISSIONS.has(permission)) {
       await markFailed(
         "unauthorized",
-        `**Stitch** cannot run \`/stitch fix\` for @${commandCommentAuthor}: need GitHub **write**, **maintain**, or **admin** on \`${owner}/${repo}\` (got **${permission ?? "none"}**).`,
+        `**Stitch AI** cannot run \`/stitch fix\`: the GitHub account that posted the command needs **write**, **maintain**, or **admin** on \`${owner}/${repo}\` (current: **${permission ?? "none"}**).`,
       );
       return { skipped: "unauthorized" as const };
     }
@@ -323,9 +337,23 @@ export const createIssueFixPullRequest = inngest.createFunction(
     });
 
     if (chunks.length < MIN_CONTEXT_CHUNKS) {
+      if (chunks.length === 0) {
+        await step.run("queue-reindex-for-fix", async () => {
+          await inngest.send({
+            id: `repository.connected:reindex-fix:${userId}:${owner}/${repo}`,
+            name: "repository.connected",
+            data: { owner, repo, userId },
+          });
+        });
+      }
+      const fixNote =
+        chunks.length === 0
+          ? `\n\n**Stitch AI** has **queued a full re-index** (\`repository.connected\`). In Inngest, wait until \`index-repo\` completes for \`${owner}/${repo}\`, then comment \`/stitch fix\` again on this issue.`
+          : `\n\nConfirm Pinecone has vectors for \`${owner}/${repo}\` (same \`repoId\` as indexing). Run \`index-repo\` again if needed, then retry \`/stitch fix\`.`;
       await markFailed(
         "insufficient_context",
-        `**Stitch** needs at least ${MIN_CONTEXT_CHUNKS} indexed context chunks to plan a safe change (found ${chunks.length}). Re-index the repo and try again.`,
+        `**Stitch AI** needs at least ${MIN_CONTEXT_CHUNKS} indexed context chunks to plan a safe change (found ${chunks.length}).` +
+          fixNote,
       );
       return { skipped: "insufficient_context" as const };
     }
@@ -384,7 +412,7 @@ export const createIssueFixPullRequest = inngest.createFunction(
     if (!planResult.ok) {
       await markFailed(
         "plan_failed",
-        `**Stitch** could not build a valid fix plan (JSON / validation). ${planResult.error}`,
+        `**Stitch AI** could not build a valid fix plan (JSON / validation). ${planResult.error}`,
       );
       return { skipped: "plan_failed" as const };
     }
@@ -395,7 +423,7 @@ export const createIssueFixPullRequest = inngest.createFunction(
     if (!filteredFiles.length || filteredFiles.length > MAX_AUTO_PR_FILES) {
       await markFailed(
         "bad_plan_files",
-        "**Stitch** rejected the plan: no allowed file paths after safety filters, or too many files.",
+        "**Stitch AI** rejected the plan: no allowed file paths after safety filters, or too many files.",
       );
       return { skipped: "bad_plan_files" as const };
     }
@@ -530,7 +558,7 @@ export const createIssueFixPullRequest = inngest.createFunction(
           owner,
           repo,
           `[stitch] ${issue.title.slice(0, 120)}`,
-          `Automated fix for #${issueNumber}.\n\nCloses #${issueNumber}\n\n---\n*Opened by Stitch via \`/stitch fix\` from @${commandCommentAuthor}*`,
+          `Automated fix for #${issueNumber}.\n\nCloses #${issueNumber}\n\n---\n*Opened by **Stitch AI** via \`/stitch fix\`.*`,
           branchName,
           baseBranch
         );
@@ -546,7 +574,7 @@ export const createIssueFixPullRequest = inngest.createFunction(
     if (!prResult.ok) {
       await markFailed(
         "pr_open_failed",
-        `**Stitch** wrote branch \`${branchName}\` but could not open a PR: ${prResult.error}`,
+        `**Stitch AI** wrote branch \`${branchName}\` but could not open a PR: ${prResult.error}`,
       );
       return { skipped: "pr_open_failed" as const };
     }
@@ -568,7 +596,7 @@ export const createIssueFixPullRequest = inngest.createFunction(
         owner,
         repo,
         issueNumber,
-        `**Stitch** opened pull request ${pr.htmlUrl} from branch \`${branchName}\`.`,
+        `**Stitch AI** opened pull request ${pr.htmlUrl} from branch \`${branchName}\`.`,
       );
     });
 
