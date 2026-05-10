@@ -12,7 +12,6 @@ import {
   LayoutDashboard,
   GitPullRequest,
   MessageSquare,
-  CreditCard,
   MessageCircle,
   FileText,
   type LucideIcon
@@ -87,11 +86,6 @@ const navigationItems: NavItem[] = [
     title: "Rules",
     url: "/dashboard/rules",
     icon: FileText,
-  },
-  {
-    title: "Subscription",
-    url: "/dashboard/subscription",
-    icon: CreditCard,
   },
   {
     title: "Settings",

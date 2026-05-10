@@ -12,7 +12,7 @@ Stitch is a **GitHub-aware developer workspace** on **Next.js App Router**: conn
 2. Index connected repositories asynchronously with **Inngest**.
 3. Store vectorized context in **Pinecone** for retrieval.
 4. Use retrieved context in **dashboard** review flows and optional **public Zynd** RAG path.
-5. **Roadmap:** subscription and usage limits on connect/review actions (not fully modeled in DB yet — see `MEMORY.md`).
+5. Keep the hackathon flow simple: repo connect, indexing, reviews, issue automation, and chat should work without billing gates.
 
 ## Public Zynd agent (`codereview`)
 

@@ -38,7 +38,7 @@ Stitch is a **GitHub-aware developer workspace** built on **Next.js App Router**
 2. Index connected repositories asynchronously with Inngest.
 3. Store vectorized context in Pinecone for retrieval.
 4. Use retrieved context in review and AI workflows.
-5. **Roadmap:** subscription and usage limits during repository/review actions (schema does not yet include usage tiers — see `MEMORY.md`).
+5. Keep the hackathon flow simple: repo connect, indexing, reviews, issue automation, and chat should work without billing gates.
 
 ### AI agent quick navigation
 
@@ -110,10 +110,12 @@ npm run dev
 | `app/dashboard/repositories/page.tsx` | Repo connect/disconnect |
 | `app/dashboard/reviews/page.tsx` | PR review history + issue automation history (independent data fetches) |
 | `app/dashboard/pull-requests/page.tsx` | Stitch **`AutoPullRequest`** list (plan from **`parseStoredStitchIssueFixPlan`**) |
+| `app/dashboard/chat/page.tsx` | Repository-scoped RAG chat (RetroUI + AI Elements; **`module/chat`**) |
 | `app/dashboard/settings/page.tsx` | Settings + **GitHub permissions** refresh card |
 | `app/api/auth/[...all]/route.ts` | Better Auth |
 | `app/api/inngest/route.ts` | Inngest handler |
 | `app/api/webhooks/github/route.ts` | GitHub webhook: **`GITHUB_WEBHOOK_SECRET`** + HMAC (`lib/github-webhook-verify.ts`) + `pull_request` / `issues` / `issue_comment` → Inngest |
+| `app/api/chat/route.ts` | **`POST`**: UI message stream; repo-scoped **`retrieveContext`** (`fullName` → Pinecone **`repoId`**); **`ChatSession`** / **`ChatMessage`** persistence |
 
 ### Data model summary (`prisma/schema.prisma`)
 
@@ -149,9 +151,8 @@ npm run dev
 
 ### Known gaps
 
-- Subscription / usage limits: steering goal; not fully in schema yet.
 - Full chat assistant beyond PR review: incomplete.
-- **Dashboard nav:** some sidebar links (e.g. Chat, Rules, Subscription) may not have **`app/dashboard/...`** pages yet — verify routes before assuming they exist.
+- **Dashboard nav:** some sidebar links (e.g. Chat, Rules) may not have **`app/dashboard/...`** pages yet — verify routes before assuming they exist.
 
 ### Architecture (mermaid)
 

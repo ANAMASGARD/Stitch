@@ -47,9 +47,14 @@ export const connectRepository = async (owner: string, repo: string, githubId: n
 
     // TODO: CHECK IF USER CAN CONNECT MORE REPO
 
-    const webhook = await createWebhook(normalizedOwner, normalizedRepo);
+    const existingRepository = await prisma.repository.findFirst({
+        where: {
+            githubId: BigInt(githubId),
+            userId: session.user.id
+        }
+    });
 
-    if (webhook) {
+    if (!existingRepository) {
         await prisma.repository.create({
             data: {
                 githubId: BigInt(githubId),
@@ -60,6 +65,14 @@ export const connectRepository = async (owner: string, repo: string, githubId: n
                 userId: session.user.id
             }
         });
+    }
+
+    let webhookConfigured = false;
+    try {
+        const webhook = await createWebhook(normalizedOwner, normalizedRepo);
+        webhookConfigured = Boolean(webhook);
+    } catch (error) {
+        console.error("Failed to create or update GitHub webhook:", error);
     }
 
     // TODO: INCREMENT REPOSITORY COUNT FOR USAGE TRACKING
@@ -79,7 +92,7 @@ export const connectRepository = async (owner: string, repo: string, githubId: n
         console.error("Failed to trigger repository indexing:", error);
     }
 
-    return webhook;
+    return { success: true, webhookConfigured };
 };
 
 export const disconnectRepository = async (githubId: number) => {

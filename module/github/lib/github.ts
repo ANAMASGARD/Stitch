@@ -237,9 +237,10 @@ export const createWebhook = async (owner: string, repo: string) => {
 
     const secret = process.env.GITHUB_WEBHOOK_SECRET?.trim();
     if (!secret) {
-        throw new Error(
-            "GITHUB_WEBHOOK_SECRET is required to create or update the GitHub webhook (signature verification)."
+        console.warn(
+            "Skipping GitHub webhook setup because GITHUB_WEBHOOK_SECRET is not configured. Repository indexing can still run, but GitHub webhook events will not be received."
         );
+        return null;
     }
 
     const octokit = new Octokit({ auth: token });

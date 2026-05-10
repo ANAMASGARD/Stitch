@@ -89,7 +89,7 @@ Format your response in markdown.${extra}`;
 
   try {
     const { text } = await generateText({
-      model: openrouter("google/gemma-4-31b-it:free"),
+      model: openrouter("qwen/qwen3.5-flash-02-23"),
       prompt,
     });
     return text;
@@ -125,7 +125,7 @@ ${userText}${extra}`;
 
   try {
     const { text } = await generateText({
-      model: openrouter("google/gemma-4-31b-it:free"),
+      model: openrouter("qwen/qwen3.5-flash-02-23"),
       prompt,
     });
     return text;

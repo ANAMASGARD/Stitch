@@ -13,7 +13,7 @@ Persistent guide for coding agents. Long-form onboarding, folder map, and **Zynd
 Stitch is a Next.js App Router application for GitHub-aware developer workflows:
 
 - User authentication (better-auth)
-- Dashboard: home, repositories, **reviews** (PR history + issue automation), **pull-requests** (Stitch **`AutoPullRequest`** list), settings (incl. GitHub re-auth). Some sidebar destinations are still roadmap-only — see **Known gaps**.
+- Dashboard: home, repositories, **reviews** (PR history + issue automation), **pull-requests** (Stitch **`AutoPullRequest`** list), **chat** (RAG-backed repo Q&A, persisted threads), settings (incl. GitHub re-auth). Some sidebar destinations are still roadmap-only — see **Known gaps**.
 - GitHub API integration (Octokit core stack in **`module/github/lib/octokit.ts`**)
 - Async indexing with **Inngest** (`repository.connected` → Pinecone)
 - RAG: **`module/ai/lib/rag.ts`** + **`lib/pinecone.ts`**
@@ -57,7 +57,7 @@ Stitch is a Next.js App Router application for GitHub-aware developer workflows:
 | Area | Contents |
 |------|----------|
 | `app/` | Routes, layouts, API handlers |
-| `module/` | Domain: `ai`, `auth`, `dashboard`, `github`, `repository`, `review`, `issue`, **`pull-request`**, `settings`, `landing` |
+| `module/` | Domain: `ai`, `auth`, `dashboard`, `github`, `repository`, `review`, `issue`, **`pull-request`**, **`chat`**, `settings`, `landing` |
 | `inngest/` | Client + **`functions/`** (`indexRepo`, **`generateReview`**, **`analyzeIssue`**, **`createIssueFixPullRequest`**, …) |
 | `components/` | `retroui/`, `ui/`, `ai-elements/`, `providers/` |
 | `lib/` | `db`, `auth`, `pinecone`, **`github-webhook-verify`**, **`stitch-github-commands`**, utilities |
@@ -68,9 +68,10 @@ Stitch is a Next.js App Router application for GitHub-aware developer workflows:
 
 - `app/page.tsx` — landing
 - `app/(auth)/login/page.tsx` — login (**Suspense** + async child for Cache Components)
-- `app/dashboard/*` — dashboard shell, repos, **reviews** (reviews + issue automation sections), **pull-requests** (Stitch **`AutoPullRequest`** list), settings
+- `app/dashboard/*` — dashboard shell, repos, **reviews** (reviews + issue automation sections), **pull-requests** (Stitch **`AutoPullRequest`** list), **chat** (Pinecone-scoped threads), settings
 - `app/api/auth/[...all]/route.ts` — Better Auth
 - `app/api/webhooks/github/route.ts` — GitHub webhook: **`GITHUB_WEBHOOK_SECRET`** + `x-hub-signature-256` (**`lib/github-webhook-verify.ts`**), **`pull_request` / `issues` / `issue_comment`** → Inngest; **`/stitch fix`** detection via **`lib/stitch-github-commands.ts`**
+- `app/api/chat/route.ts` — authenticated **`POST`**: UI message stream; **`retrieveContext(lastUserText, repository.fullName)`** (Pinecone **`repoId`** = `fullName`); persists **`ChatSession`** / **`ChatMessage`**
 - `app/api/inngest/route.ts` — Inngest `serve(...)`
 
 ### Repository (`module/repository/`)
@@ -138,9 +139,7 @@ Stitch is a Next.js App Router application for GitHub-aware developer workflows:
 
 ## Known gaps
 
-- **Sidebar:** items like **Chat**, **Rules**, **Subscription** may still point at routes **not implemented** under `app/dashboard/` — only add nav entries when the page exists.
-- Repository usage quotas — not fully enforced in **`connectRepository`**
-- Subscription tier / **UserUsage** — steering goal; see **`MEMORY.md`**
+- **Sidebar:** items like **Chat** and **Rules** may still point at routes **not implemented** under `app/dashboard/` — only add nav entries when the page exists.
 
 ## Agent operating guidelines
 

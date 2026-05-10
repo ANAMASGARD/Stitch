@@ -14,8 +14,7 @@ Updated snapshot of what the codebase **actually contains**. Prefer this over st
 
 ## Data model (current Prisma)
 
-- **User**, **Session**, **Account**, **Verification**, **Repository**, **Review**, **IssueAnalysis**, **AutoPullRequest**.
-- No **`UserUsage`** / subscription tier fields in schema yet — tiered billing is **product agenda**, not implemented DB-side.
+- **User**, **Session**, **Account**, **Verification**, **Repository**, **Review**, **IssueAnalysis**, **AutoPullRequest**, **ChatSession**, **ChatMessage**.
 
 ## Major flows (implemented)
 
@@ -24,6 +23,7 @@ Updated snapshot of what the codebase **actually contains**. Prefer this over st
 3. **Issue automation:** Verified GitHub webhook (`GITHUB_WEBHOOK_SECRET`, `x-hub-signature-256`, **`lib/github-webhook-verify.ts`**) → **`issue.analysis.requested`** / **`issue.auto_pr.requested`** → **`inngest/functions/issue.ts`** (RAG floor, triage comment, collaborator-gated **`/stitch fix`** → branch/commits/PR). Command detection: **`lib/stitch-github-commands.ts`**. LLM: **`module/ai/lib/issue-to-pr-llm.ts`** (incl. **`parseStoredStitchIssueFixPlan`** for persisted **`AutoPullRequest.planJson`**). Dashboard: **`module/issue/actions`**, “Issue automation” section on **`app/dashboard/reviews/page.tsx`** (separate React Query from reviews so one failure does not blank the other).
 4. **Stitch pull requests page:** **`app/dashboard/pull-requests/page.tsx`** + **`module/pull-request/actions/getStitchPullRequests`** lists **`AutoPullRequest`** for the signed-in user (RetroUI cards, status color map, optional plan block). Sidebar already links **`/dashboard/pull-requests`**.
 5. **Auth / Next.js 16:** **`lib/auth.ts`** GitHub scopes include **`admin:repo_hook`** for webhook registration. **`app/(auth)/login/page.tsx`**: sync shell + **`<Suspense>`** around async **`requireUnAuth`** + **`LoginUI`** for **`cacheComponents`** builds. Settings: **`GithubPermissionsCard`** for re-OAuth.
+6. **Repository chat:** **`app/dashboard/chat/page.tsx`** + **`module/chat/*`** — pick a connected repo, **`ChatSession`** / **`ChatMessage`** in Postgres; **`POST`** **`app/api/chat/route.ts`** streams via AI SDK, **`retrieveContext`** uses **`repository.fullName`** as Pinecone **`repoId`**, last user message only for the vector query; titles from first user line (no LLM).
 
 ## Operational notes for agents
 
@@ -46,9 +46,8 @@ Updated snapshot of what the codebase **actually contains**. Prefer this over st
 
 ## Known gaps
 
-- **Subscription / usage enforcement** — planned; schema does not yet mirror the old “UserUsage” story.
 - Full **chat assistant** product surface beyond reviews — not wired end-to-end.
-- **Sidebar routes:** **Chat**, **Rules**, **Subscription** (and any similar nav items) may not have matching **`app/dashboard/.../page.tsx`** files yet — verify before assuming they work.
+- **Sidebar routes:** **Chat**, **Rules** (and any similar nav items) may not have matching **`app/dashboard/.../page.tsx`** files yet — verify before assuming they work.
 
 ## Registry / ops
 

@@ -1,4 +1,4 @@
-import { pineconeIndex } from "@/lib/pinecone";
+import { PINECONE_INDEX_NAME, pinecone, pineconeIndex } from "@/lib/pinecone";
 import { embed, embedMany } from "ai";
 import { google } from "@ai-sdk/google";
 
@@ -27,6 +27,19 @@ type RetrievedChunk = {
   content?: string;
 };
 
+type SearchRecordsHit = {
+  _score?: number;
+  fields?: Record<string, unknown>;
+};
+
+type DocumentSearchMatch = Record<string, unknown> & {
+  _score?: number;
+};
+
+type DocumentSearchResponse = {
+  matches?: DocumentSearchMatch[];
+};
+
 type IndexCodebaseResult = {
   repoId: string;
   indexedFiles: number;
@@ -43,6 +56,9 @@ const CHUNK_OVERLAP = 200;
 const EMBEDDING_BATCH_SIZE = 32;
 const UPSERT_BATCH_SIZE = 100;
 const EMBEDDING_DIMENSIONS = 1024;
+const DOCUMENTS_NAMESPACE = "__default__";
+
+let pineconeIndexHostPromise: Promise<string> | null = null;
 
 function formatDocumentForEmbedding(path: string, content: string) {
   return `title: ${path} | text: ${content}`;
@@ -58,6 +74,75 @@ function assertEmbeddingDimension(embedding: number[]) {
       `Embedding dimension mismatch: expected ${EMBEDDING_DIMENSIONS}, got ${embedding.length}`
     );
   }
+}
+
+function getPineconeIndexHost() {
+  pineconeIndexHostPromise ??= pinecone
+    .describeIndex(PINECONE_INDEX_NAME)
+    .then((index) => {
+      if (!index.host) {
+        throw new Error(`Pinecone index ${PINECONE_INDEX_NAME} has no host`);
+      }
+      return index.host;
+    });
+  return pineconeIndexHostPromise;
+}
+
+function documentSearchTextFromMatch(match: DocumentSearchMatch) {
+  for (const key of ["content", "text", "chunk_text", "body"]) {
+    const value = match[key];
+    if (typeof value === "string" && value.trim()) {
+      return value;
+    }
+  }
+  return undefined;
+}
+
+async function searchDocumentIndex(
+  query: string,
+  repoId: string,
+  topK: number
+): Promise<RetrievedChunk[]> {
+  const apiKey = process.env.PINECONE_DB_API_KEY;
+  if (!apiKey) {
+    throw new Error("PINECONE_DB_API_KEY is required for Pinecone document search");
+  }
+
+  const host = await getPineconeIndexHost();
+  const response = await fetch(
+    `https://${host}/namespaces/${DOCUMENTS_NAMESPACE}/documents/search`,
+    {
+      method: "POST",
+      headers: {
+        "Api-Key": apiKey,
+        "Content-Type": "application/json",
+        "X-Pinecone-Api-Version": "2026-01.alpha",
+      },
+      body: JSON.stringify({
+        include_fields: ["*"],
+        score_by: [{ type: "query_string", query }],
+        filter: { repoId: { $eq: repoId } },
+        top_k: topK,
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`Pinecone documents search failed: ${response.status} ${body}`);
+  }
+
+  const results = (await response.json()) as DocumentSearchResponse;
+  return (results.matches ?? [])
+    .map((match) => ({
+      score: match._score,
+      path: match.path as string | undefined,
+      chunkIndex: match.chunkIndex as number | undefined,
+      startOffset: match.startOffset as number | undefined,
+      endOffset: match.endOffset as number | undefined,
+      content: documentSearchTextFromMatch(match),
+    }))
+    .filter((match) => Boolean(match.content));
 }
 
 export async function generateEmbedding(text: string) {
@@ -203,28 +288,102 @@ export async function indexCodebase(
   };
 }
 
+export async function hasIndexedCodebase(repoId: string): Promise<boolean> {
+  const prefix = `${sanitizeRecordIdPart(repoId)}-`;
+
+  try {
+    const results = await pineconeIndex.listPaginated({ prefix, limit: 1 });
+    return (results.vectors?.length ?? 0) > 0;
+  } catch (e) {
+    console.error("[rag] failed to check indexed codebase", e);
+    return false;
+  }
+}
+
 export async function retrieveContext(
   query: string,
   repoId: string,
   topK: number = 5
 ): Promise<RetrievedChunk[]> {
-  const embedding = await generateEmbedding(query);
+  try {
+    return await searchDocumentIndex(query, repoId, topK);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    if (message.includes("must be queried using the documents API")) {
+      throw e;
+    }
+  }
 
-  const results = await pineconeIndex.query({
-    vector: embedding,
-    filter: { repoId },
-    topK,
-    includeMetadata: true,
-  });
+  try {
+    const results = await pineconeIndex.searchRecords({
+      query: {
+        inputs: { text: query },
+        filter: { repoId },
+        topK,
+      },
+      fields: [
+        "path",
+        "chunkIndex",
+        "startOffset",
+        "endOffset",
+        "content",
+        "text",
+      ],
+    });
 
-  return results.matches
-    .map((match) => ({
-      score: match.score,
-      path: match.metadata?.path as string | undefined,
-      chunkIndex: match.metadata?.chunkIndex as number | undefined,
-      startOffset: match.metadata?.startOffset as number | undefined,
-      endOffset: match.metadata?.endOffset as number | undefined,
-      content: match.metadata?.content as string | undefined,
-    }))
-    .filter((match) => Boolean(match.content));
+    return ((results.result?.hits ?? []) as SearchRecordsHit[])
+      .map((hit) => {
+        const fields = hit.fields ?? {};
+        const content =
+          typeof fields.content === "string"
+            ? fields.content
+            : typeof fields.text === "string"
+              ? fields.text
+              : undefined;
+
+        return {
+          score: hit._score,
+          path: fields.path as string | undefined,
+          chunkIndex: fields.chunkIndex as number | undefined,
+          startOffset: fields.startOffset as number | undefined,
+          endOffset: fields.endOffset as number | undefined,
+          content,
+        };
+      })
+      .filter((match) => Boolean(match.content));
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    if (message.includes("documents API")) {
+      return [];
+    }
+
+    const embedding = await generateEmbedding(query);
+
+    try {
+      const results = await pineconeIndex.query({
+        vector: embedding,
+        filter: { repoId },
+        topK,
+        includeMetadata: true,
+      });
+
+      return results.matches
+        .map((match) => ({
+          score: match.score,
+          path: match.metadata?.path as string | undefined,
+          chunkIndex: match.metadata?.chunkIndex as number | undefined,
+          startOffset: match.metadata?.startOffset as number | undefined,
+          endOffset: match.metadata?.endOffset as number | undefined,
+          content: match.metadata?.content as string | undefined,
+        }))
+        .filter((match) => Boolean(match.content));
+    } catch (queryError) {
+      const queryMessage =
+        queryError instanceof Error ? queryError.message : String(queryError);
+      if (queryMessage.includes("documents API")) {
+        return [];
+      }
+      throw queryError;
+    }
+  }
 }

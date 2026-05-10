@@ -17,7 +17,8 @@ model User {
   updatedAt     DateTime  @updatedAt
   sessions      Session[]
   accounts      Account[]
-  repositories Repository[]
+  repositories  Repository[]
+  chatSessions  ChatSession[]
 
   @@unique([email])
   @@map("user")
@@ -35,11 +36,43 @@ model Repository {
   reviews          Review[]
   issueAnalyses    IssueAnalysis[]
   autoPullRequests AutoPullRequest[]
+  chatSessions     ChatSession[]
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
 
   @@index([userId])
   @@map("repository")
+}
+
+model ChatSession {
+  id             String        @id @default(cuid())
+  userId         String
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  repositoryId   String
+  repository     Repository    @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  title          String
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  messages       ChatMessage[]
+
+  @@index([userId])
+  @@index([repositoryId])
+  @@map("chat_session")
+}
+
+model ChatMessage {
+  id               String      @id @default(cuid())
+  sessionId        String
+  session          ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  role             String
+  content          String      @db.Text
+  /** Client UIMessage id for idempotent user saves on retry/regenerate */
+  clientMessageId  String?
+  createdAt        DateTime    @default(now())
+
+  @@index([sessionId])
+  @@unique([sessionId, clientMessageId])
+  @@map("chat_message")
 }
 
 model Review {
