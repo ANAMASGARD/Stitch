@@ -30,7 +30,7 @@ Requires **`ZYND_AGENT_KEYPAIR_PATH`** (or private key env), **`ZYND_ENTITY_URL`
 
 ## Stitch — product summary
 
-Stitch is a **GitHub-aware developer workspace** built on **Next.js App Router**. Users connect repositories, **Inngest** indexes code asynchronously, **Pinecone** stores vectors for RAG, and AI workflows produce **PR reviews** with optional repo context.
+Stitch is a **GitHub-aware developer workspace** built on **Next.js App Router**. Users connect repositories, **Inngest** indexes code asynchronously, **Pinecone** stores vectors for RAG, and AI workflows produce **PR reviews** with optional repo context. **Issue automation** (signed webhook → triage + collaborator-gated **`/stitch fix`** auto-PR) and a **Stitch pull requests** dashboard list **`AutoPullRequest`** history. **`next.config.ts`** enables **Cache Components** — **`/login`** uses **`<Suspense>`** around async auth reads.
 
 ### Project agenda
 
@@ -44,7 +44,8 @@ Stitch is a **GitHub-aware developer workspace** built on **Next.js App Router**
 
 - Auth: `lib/auth.ts`, `lib/auth-client.ts`, `app/api/auth/[...all]/route.ts`, `module/auth/*`
 - Repository connect/disconnect: `module/repository/actions/index.ts`, `module/repository/hooks/*`, `app/dashboard/repositories/page.tsx`
-- Review generation: `module/ai/actions/index.ts`, `module/review/actions/index.ts`, `app/dashboard/reviews/page.tsx`
+- Review generation: `module/ai/actions/index.ts`, `module/review/actions/index.ts`, `app/dashboard/reviews/page.tsx` (split queries: reviews vs issue automation)
+- Issue automation + Stitch PR list: `app/api/webhooks/github/route.ts`, `lib/github-webhook-verify.ts`, `lib/stitch-github-commands.ts`, `inngest/functions/issue.ts`, `module/ai/lib/issue-to-pr-llm.ts`, `module/issue/actions/index.ts`, `app/dashboard/pull-requests/page.tsx`, `module/pull-request/actions/index.ts`
 - GitHub API: `module/github/lib/github.ts`, **`module/github/lib/octokit.ts`** (shared Octokit preset — do not use the `octokit` meta-package)
 - RAG / indexing: `module/ai/lib/rag.ts`, `inngest/functions/index.ts`, `app/api/inngest/route.ts`
 - Shared LLM markdown contract: **`module/ai/lib/pr-review-llm.ts`**
@@ -82,6 +83,8 @@ npx prisma migrate dev
 npx prisma generate
 ```
 
+After schema changes, **restart** `npm run dev` so the Prisma singleton picks up new models (e.g. **`IssueAnalysis`** / **`AutoPullRequest`** delegates).
+
 **Run Next app:**
 
 ```bash
@@ -102,20 +105,23 @@ npm run dev
 | Route / file | Feature |
 |--------------|---------|
 | `app/page.tsx` | Landing |
-| `app/(auth)/login/page.tsx` | Login |
+| `app/(auth)/login/page.tsx` | Login (**Suspense** + async child for **`cacheComponents`**) |
 | `app/dashboard/page.tsx` | Dashboard |
 | `app/dashboard/repositories/page.tsx` | Repo connect/disconnect |
-| `app/dashboard/reviews/page.tsx` | Review history / triggers |
-| `app/dashboard/settings/page.tsx` | Settings |
+| `app/dashboard/reviews/page.tsx` | PR review history + issue automation history (independent data fetches) |
+| `app/dashboard/pull-requests/page.tsx` | Stitch **`AutoPullRequest`** list (plan from **`parseStoredStitchIssueFixPlan`**) |
+| `app/dashboard/settings/page.tsx` | Settings + **GitHub permissions** refresh card |
 | `app/api/auth/[...all]/route.ts` | Better Auth |
 | `app/api/inngest/route.ts` | Inngest handler |
-| `app/api/webhooks/github/route.ts` | GitHub webhook (minimal) |
+| `app/api/webhooks/github/route.ts` | GitHub webhook: **`GITHUB_WEBHOOK_SECRET`** + HMAC (`lib/github-webhook-verify.ts`) + `pull_request` / `issues` / `issue_comment` → Inngest |
 
 ### Data model summary (`prisma/schema.prisma`)
 
 - **User**, **Session**, **Account**, **Verification**
 - **Repository** — connected GitHub repos
 - **Review** — stored AI review text per repo/PR
+- **IssueAnalysis** — one triage row per connected repo issue
+- **AutoPullRequest** — audit trail for `/stitch fix` runs (comment id, actor, branch, PR, status, **`planJson`**)
 
 ### Core flows
 
@@ -126,10 +132,15 @@ npm run dev
 3. Event **`repository.connected`** → Inngest **`indexRepo`**.
 4. Files fetched via GitHub API → **`module/ai/lib/rag.ts`** chunks/embeds/upserts → Pinecone.
 
-**Create review (dashboard)**
+**Create review (dashboard / webhook)**
 
-1. Flow enters via **`module/ai/actions/index.ts`** / review actions.
+1. Flow enters via **`module/ai/actions/index.ts`** or **`app/api/webhooks/github/route.ts`** (`pull_request` opened/synchronize) → **`pr.review.requested`**.
 2. Inngest **`inngest/functions/review.ts`**: user token → **`getPullRequestDiff`** (+ optional RAG) → **`generatePrReviewMarkdown`** → GitHub comment + DB row.
+
+**Issue triage + `/stitch fix` auto-PR**
+
+1. Signed webhook → **`issue.analysis.requested`** (issues opened/reopened/edited) or **`issue.auto_pr.requested`** (issue comment starting with `/stitch fix`; skips PR conversation threads + bots).
+2. **`inngest/functions/issue.ts`**: **`analyzeIssue`** / **`createIssueFixPullRequest`** — RAG minimum chunk guard, collaborator permission, Zod-backed plan in **`module/ai/lib/issue-to-pr-llm.ts`**.
 
 **Zynd agent (public / judge)**
 
@@ -138,9 +149,9 @@ npm run dev
 
 ### Known gaps
 
-- GitHub webhook route is still minimal.
 - Subscription / usage limits: steering goal; not fully in schema yet.
 - Full chat assistant beyond PR review: incomplete.
+- **Dashboard nav:** some sidebar links (e.g. Chat, Rules, Subscription) may not have **`app/dashboard/...`** pages yet — verify routes before assuming they exist.
 
 ### Architecture (mermaid)
 
@@ -186,6 +197,7 @@ Excludes `.git`, `.next`, `node_modules`:
 ./app/dashboard
 ./app/dashboard/repositories
 ./app/dashboard/reviews
+./app/dashboard/pull-requests
 ./app/dashboard/settings
 ./components
 ./components/ai-elements
@@ -221,6 +233,10 @@ Excludes `.git`, `.next`, `node_modules`:
 ./module/repository/hooks
 ./module/review
 ./module/review/actions
+./module/issue
+./module/issue/actions
+./module/pull-request
+./module/pull-request/actions
 ./module/settings
 ./module/settings/actions
 ./module/settings/components
@@ -236,9 +252,9 @@ Excludes `.git`, `.next`, `node_modules`:
 | Area | Purpose |
 |------|---------|
 | `app/` | Routes, layouts, API handlers |
-| `module/` | Feature modules (ai, auth, dashboard, github, repository, review, settings, landing) |
+| `module/` | Feature modules (ai, auth, dashboard, github, repository, review, **issue**, **pull-request**, settings, landing) |
 | `components/` | Shared UI; prefer **`retroui/`** |
-| `lib/` | DB, auth, Pinecone, utilities |
+| `lib/` | DB, auth, Pinecone, **github-webhook-verify**, **stitch-github-commands**, utilities |
 | `inngest/` | Background jobs |
 | `prisma/` | Schema + migrations |
 | `hooks/` | Shared React hooks |

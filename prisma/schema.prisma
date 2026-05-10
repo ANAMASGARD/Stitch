@@ -24,17 +24,19 @@ model User {
 }
 
 model Repository {
-  id        String   @id @default(cuid())
-  githubId  BigInt   @unique
-  name      String
-  owner     String
-  fullName  String
-  url       String
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  reviews   Review[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id               String           @id @default(cuid())
+  githubId         BigInt           @unique
+  name             String
+  owner            String
+  fullName         String
+  url              String
+  userId           String
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reviews          Review[]
+  issueAnalyses    IssueAnalysis[]
+  autoPullRequests AutoPullRequest[]
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
 
   @@index([userId])
   @@map("repository")
@@ -54,6 +56,45 @@ model Review {
 
   @@index([repositoryId])
   @@map("review")
+}
+
+model IssueAnalysis {
+  id                  String     @id @default(cuid())
+  repositoryId        String
+  repository          Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  issueNumber         Int
+  issueTitle          String?
+  issueUrl            String?
+  classification      String
+  analysis            String     @db.Text
+  contextChunkCount   Int        @default(0)
+  status              String     @default("completed")
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+
+  @@unique([repositoryId, issueNumber])
+  @@index([repositoryId])
+  @@map("issue_analysis")
+}
+
+model AutoPullRequest {
+  id                     String     @id @default(cuid())
+  repositoryId           String
+  repository             Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  issueNumber            Int
+  commandCommentId       String     @unique
+  commandCommentAuthor   String
+  branchName             String?
+  prNumber               Int?
+  prUrl                  String?
+  status                 String
+  planJson               String?    @db.Text
+  failureReason          String?    @db.Text
+  createdAt              DateTime   @default(now())
+  updatedAt              DateTime   @updatedAt
+
+  @@index([repositoryId, issueNumber])
+  @@map("auto_pull_request")
 }
 
 model Session {

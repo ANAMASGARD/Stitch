@@ -13,15 +13,20 @@ Persistent guide for coding agents. Long-form onboarding, folder map, and **Zynd
 Stitch is a Next.js App Router application for GitHub-aware developer workflows:
 
 - User authentication (better-auth)
-- Dashboard + settings + repositories + reviews
+- Dashboard: home, repositories, **reviews** (PR history + issue automation), **pull-requests** (Stitch **`AutoPullRequest`** list), settings (incl. GitHub re-auth). Some sidebar destinations are still roadmap-only — see **Known gaps**.
 - GitHub API integration (Octokit core stack in **`module/github/lib/octokit.ts`**)
 - Async indexing with **Inngest** (`repository.connected` → Pinecone)
 - RAG: **`module/ai/lib/rag.ts`** + **`lib/pinecone.ts`**
 - AI PR review: dashboard path via Inngest + shared **`module/ai/lib/pr-review-llm.ts`**
+- **Issue automation:** GitHub webhook (signed) → Inngest **`analyzeIssue`** (triage comment) + **`createIssueFixPullRequest`** (collaborator-gated **`/stitch fix`** → branch/PR); LLM **`module/ai/lib/issue-to-pr-llm.ts`**; history on dashboard reviews page + **`IssueAnalysis`** / **`AutoPullRequest`** in Prisma
 - **Zynd network agent** **`codereview`**: root **`agent.ts`**, schemas **`payload.ts`**, metadata **`agent.config.json`** — public webhook + registry listing ([Zynd registry](https://www.zynd.ai/registry))
 
 ## What we have achieved (recent)
 
+- **Next.js Cache Components:** `next.config.ts` sets **`cacheComponents: true`**. **`app/(auth)/login/page.tsx`** wraps the async session gate (**`requireUnAuth`**) in **`<Suspense>`** with a RetroUI fallback so **`next build`** does not hit “uncached data outside Suspense” on `/login`.
+- **GitHub OAuth (seamless):** **`lib/auth.ts`** requests **`read:user`**, **`user:email`**, **`repo`**, **`admin:repo_hook`**. **`module/settings/components/github-permissions-card.tsx`** + Settings page: **“Refresh GitHub permissions”** re-runs **`signIn.social({ provider: "github", callbackURL: "/dashboard/settings" })`** for users who signed in before scope changes. **`GITHUB_WEBHOOK_SECRET`** is operator-only (documented in **`.env.example`** / **`README.md`**); users never see it.
+- **Reviews dashboard resilience:** **`app/dashboard/reviews/page.tsx`** uses **two** React Query keys (`reviews` vs `issue-automation`) so **`getIssueAutomationHistory`** failures do not blank PR review history; **`module/issue/actions`** defensively handles a stale Prisma singleton missing new models.
+- **Stitch pull requests UI:** **`app/dashboard/pull-requests/page.tsx`** + **`module/pull-request/actions/index.ts`** list **`AutoPullRequest`** rows (Stitch **`/stitch fix`** runs) with RetroUI cards; **`parseStoredStitchIssueFixPlan`** in **`module/ai/lib/issue-to-pr-llm.ts`** safely parses **`planJson`** (Zod).
 - **`generatePrReviewMarkdown`** / **`generateFreeformReviewMarkdown`** centralized in **`module/ai/lib/pr-review-llm.ts`**; **`inngest/functions/review.ts`** uses the same contract as the Zynd agent.
 - **`getPullRequestDiff`** enriches prompts with GitHub PR metadata (files, reviews, inline comments, issue comments) when generating reviews.
 - **Zynd agent** validates **`payload.ts`** (`RequestPayload.safeParse` after JSON-in-content merge); **`ENABLE_PUBLIC_RAG`** gates Pinecone on public calls; RAG loaded **only when** `use_rag` + env allow (lazy `import()` — no `server-only` conflict with `npx zynd agent run`).
@@ -52,20 +57,20 @@ Stitch is a Next.js App Router application for GitHub-aware developer workflows:
 | Area | Contents |
 |------|----------|
 | `app/` | Routes, layouts, API handlers |
-| `module/` | Domain: `ai`, `auth`, `dashboard`, `github`, `repository`, `review`, `settings`, `landing` |
-| `inngest/` | Client + **`functions/`** (`indexRepo`, **`generateReview`**, …) |
+| `module/` | Domain: `ai`, `auth`, `dashboard`, `github`, `repository`, `review`, `issue`, **`pull-request`**, `settings`, `landing` |
+| `inngest/` | Client + **`functions/`** (`indexRepo`, **`generateReview`**, **`analyzeIssue`**, **`createIssueFixPullRequest`**, …) |
 | `components/` | `retroui/`, `ui/`, `ai-elements/`, `providers/` |
-| `lib/` | `db`, `auth`, `pinecone`, utilities |
+| `lib/` | `db`, `auth`, `pinecone`, **`github-webhook-verify`**, **`stitch-github-commands`**, utilities |
 | `prisma/` | Schema + migrations |
 | Root | **`agent.ts`**, **`payload.ts`**, **`agent.config.json`** — Zynd **`codereview`** agent only |
 
 ### Routing (`app/`)
 
 - `app/page.tsx` — landing
-- `app/(auth)/login/page.tsx` — login
-- `app/dashboard/*` — dashboard shell, repos, reviews, settings
+- `app/(auth)/login/page.tsx` — login (**Suspense** + async child for Cache Components)
+- `app/dashboard/*` — dashboard shell, repos, **reviews** (reviews + issue automation sections), **pull-requests** (Stitch **`AutoPullRequest`** list), settings
 - `app/api/auth/[...all]/route.ts` — Better Auth
-- `app/api/webhooks/github/route.ts` — GitHub webhook (minimal)
+- `app/api/webhooks/github/route.ts` — GitHub webhook: **`GITHUB_WEBHOOK_SECRET`** + `x-hub-signature-256` (**`lib/github-webhook-verify.ts`**), **`pull_request` / `issues` / `issue_comment`** → Inngest; **`/stitch fix`** detection via **`lib/stitch-github-commands.ts`**
 - `app/api/inngest/route.ts` — Inngest `serve(...)`
 
 ### Repository (`module/repository/`)
@@ -75,17 +80,20 @@ Stitch is a Next.js App Router application for GitHub-aware developer workflows:
 ### GitHub (`module/github/`)
 
 - **`lib/octokit.ts`**: shared **`Octokit`** (REST + GraphQL + pagination + retry + throttling)
-- **`lib/github.ts`**: token helpers, GraphQL contributions, repos, webhooks, **`getRepoFileContent`**, **`getPullRequestDiff`**, **`postReviewComment`**
+- **`module/github/lib/github.ts`**: token helpers, GraphQL contributions, repos, webhooks, **`getRepoFileContent`**, **`getPullRequestDiff`**, **`postReviewComment`**, issue/branch/contents/PR helpers (**`postIssueComment`**, **`createBranchFromDefault`**, **`createPullRequest`**, **`getCollaboratorPermissionLevel`**, …)
 
 ### Background jobs (`inngest/`)
 
 - **`indexRepo`** — `repository.connected` → fetch files → **`indexCodebase`**
 - **`generateReview`** — `pr.review.requested` → diff + optional RAG → **`generatePrReviewMarkdown`** → comment + **`Review`** row
+- **`analyzeIssue`** — `issue.analysis.requested` → RAG (≥3 chunks) → triage LLM → issue comment + **`IssueAnalysis`**
+- **`createIssueFixPullRequest`** — `issue.auto_pr.requested` → permission + plan + file writes → PR + **`AutoPullRequest`**
 
 ### AI (`module/ai/`)
 
 - **`lib/rag.ts`** — chunk, embed, Pinecone upsert/query (**no `server-only`** — usable from Zynd process when dynamically imported)
 - **`lib/pr-review-llm.ts`** — shared markdown review generation
+- **`module/ai/lib/issue-to-pr-llm.ts`** — issue triage + fix plan + per-file generation (Zod-validated JSON)
 
 ### Zynd agent (root)
 
@@ -105,8 +113,13 @@ Stitch is a Next.js App Router application for GitHub-aware developer workflows:
 
 ### Dashboard PR review
 
-1. **`module/ai/actions`** queues **`pr.review.requested`**
+1. **`module/ai/actions`** queues **`pr.review.requested`** (or GitHub **`pull_request`** webhook enqueues the same event)
 2. **`inngest/functions/review.ts`**: OAuth token → **`getPullRequestDiff`** → optional **`retrieveContext`** → **`generatePrReviewMarkdown`** → GitHub comment
+
+### Issue triage + `/stitch fix` auto-PR
+
+1. GitHub **`issues`** / **`issue_comment`** webhook (verified) → **`issue.analysis.requested`** / **`issue.auto_pr.requested`**
+2. **`inngest/functions/issue.ts`**: RAG guardrails (min 3 chunks), triage or command-gated writes; collaborator must have **write/maintain/admin**
 
 ### Zynd public agent
 
@@ -119,15 +132,15 @@ Stitch is a Next.js App Router application for GitHub-aware developer workflows:
 - **`PINECONE_DB_API_KEY`**, **`NEXT_PUBLIC_APP_BASE_URL`**
 - DB URL for Prisma / Postgres
 - Better Auth secrets
-- GitHub OAuth (dashboard)
+- GitHub OAuth (dashboard): scopes in **`lib/auth.ts`** (`repo`, **`admin:repo_hook`**, profile/email); **`GITHUB_WEBHOOK_SECRET`** (repo webhook HMAC, operator-only)
 - LLM: **`OPENROUTER_API_KEY`**, **`GOOGLE_GENERATIVE_AI_API_KEY`**
 - Zynd agent: **`ZYND_AGENT_KEYPAIR_PATH`**, **`ZYND_ENTITY_URL`**, **`GITHUB_READ_TOKEN`** (PR URL mode)
 
 ## Known gaps
 
-- **`app/api/webhooks/github/route.ts`** — minimal processing
+- **Sidebar:** items like **Chat**, **Rules**, **Subscription** may still point at routes **not implemented** under `app/dashboard/` — only add nav entries when the page exists.
 - Repository usage quotas — not fully enforced in **`connectRepository`**
-- Subscription tier / **UserUsage** — steering goal; current Prisma schema is User + Repository + Review only (see **`MEMORY.md`**)
+- Subscription tier / **UserUsage** — steering goal; see **`MEMORY.md`**
 
 ## Agent operating guidelines
 

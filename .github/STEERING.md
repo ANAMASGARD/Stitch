@@ -4,7 +4,7 @@ Use this file for **direction and priorities**. Pair with `MEMORY.md` (what is t
 
 ## Product north star
 
-Stitch is a **GitHub-aware developer workspace** on **Next.js App Router**: connect repos, index code in the background, and surface **AI-assisted PR review** using repo context where available.
+Stitch is a **GitHub-aware developer workspace** on **Next.js App Router**: connect repos, index code in the background, surface **AI-assisted PR review** using repo context where available, and ship **issue automation** (webhook → triage + optional **`/stitch fix`** collaborator-gated auto-PR) with **dashboard visibility** (reviews + Stitch pull-requests list).
 
 ## Near-term agenda
 
@@ -24,7 +24,7 @@ Stitch is a **GitHub-aware developer workspace** on **Next.js App Router**: conn
 
 ## Engineering constraints
 
-- **Next.js:** Treat as **Next 16.x** — check `node_modules/next/dist/docs/` for APIs that differ from older training data.
+- **Next.js:** Treat as **Next 16.x** — check `node_modules/next/dist/docs/` for APIs that differ from older training data. With **Cache Components** enabled, routes that call **`headers()`** / session helpers from server components must follow the **`Suspense`** patterns used on **`/login`**.
 - **UI:** RetroUI + Tailwind v4 tokens in `app/globals.css`; no standalone `tailwind.config.js`.
 - **Heavy work:** Prefer **Inngest** for long GitHub fetch + embedding pipelines, not plain route handlers.
 - **GitHub API:** Use **`@/module/github/lib/octokit`** (`Octokit` preset) and **`github.ts`** — do not reintroduce the `octokit` meta-package (breaks `tsx` / Node resolution for the Zynd runner).

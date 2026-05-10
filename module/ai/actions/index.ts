@@ -1,7 +1,6 @@
  "use server";
 
 import prisma from "@/lib/db";
-import { getPullRequestDiff } from "@/module/github/lib/github";
 import { inngest } from "@/inngest/client";
 
 
@@ -39,10 +38,6 @@ export async function reviewPullRequest(
     if (!githubAccount?.accessToken) {
         throw new Error("No GitHub access token found for repository owner")
     }
-
-    const token = githubAccount.accessToken
-
-    await getPullRequestDiff(token , owner , repo , prNumber)
 
     await inngest.send({
         name: "pr.review.requested",
